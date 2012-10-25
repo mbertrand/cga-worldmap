@@ -16,7 +16,7 @@ public class AuthCache {
 
     private static final Logger LOGGER = Logging.getLogger(AuthCache.class);
 
-    private static final int DEFAULT_TIMEOUT = 2000;
+    private static final int DEFAULT_TIMEOUT = 600000;
 
     private ConcurrentHashMap<String, Authentication> cache;
 

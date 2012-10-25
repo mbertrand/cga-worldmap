@@ -79,7 +79,7 @@ def geoserver_ows_proxy(request):
           #look for typename in XML, <wfs:Query typeName="feature:polytest2a_ifu"....
     elif "REQUEST" in request.GET:
         request_type = request.GET['REQUEST']
-        if request_type in ["GetMap","GetFeatureInfo"]:
+        if request_type in ["GetMap","GetFeatureInfo","DescribeLayer"]:
             type_name = urllib.unquote(request.GET['LAYERS'])
         elif request_type == "GetFeature":
             type_name = request.GET['typeName']
@@ -104,7 +104,7 @@ def geoserver_ows_proxy(request):
         return path[len(prefix):]
 
     path = strip_prefix(request.get_full_path(),  urlsplit(settings.GEOSERVER_BASE_URL).path)
-    url = "".join([settings.GEOSERVER_BASE_URL,  path])
+    url = "".join([settings.GEOSERVER_PROXY_URL,  path])
 
     response, content = http.request(
         url, request.method,

@@ -12,6 +12,8 @@ import logging
 from urlparse import urlparse
 from geonode.maps.models import LayerStats, Layer
 import re
+from django.shortcuts import render_to_response, get_object_or_404
+
 
 logger = logging.getLogger("geonode.proxy.views")
 
@@ -65,6 +67,53 @@ def proxy(request):
             content_type=result.getheader("Content-Type", "text/plain")
             )
     return response
+
+@csrf_exempt
+def geoserver_ows_proxy(request):
+    url = settings.GEOSERVER_BASE_URL + "?" + request.GET.urlencode()
+
+    headers = dict()
+    if request.method in ("POST", "PUT") and "CONTENT_TYPE" in request.META:
+        headers["Content-Type"] = request.META["CONTENT_TYPE"]
+         #if "WfsDispatcher" in url:
+          #look for typename in XML, <wfs:Query typeName="feature:polytest2a_ifu"....
+    elif "REQUEST" in request.GET:
+        request_type = request.GET['REQUEST']
+        if request_type in ["GetMap","GetFeatureInfo"]:
+            type_name = urllib.unquote(request.GET['LAYERS'])
+        elif request_type == "GetFeature":
+            type_name = request.GET['typeName']
+        try:
+            layer_obj = Layer.objetcs.get(Layer, type_name=type_name)
+
+            has_permission = request.user.has_perm("maps.change_layer", obj=layer_obj)  if request.method in (
+            "POST", "PUT") else request.user.has_perm("maps.view_layer", obj=layer_obj)
+
+            if not has_permission:
+                return 401
+
+        except:
+            logger.info("Could not find layer %s", type_name)
+
+    http = httplib2.Http()
+    http.add_credentials(*settings.GEOSERVER_CREDENTIALS)
+
+
+    def strip_prefix(path, prefix):
+        assert path.startswith(prefix)
+        return path[len(prefix):]
+
+    path = strip_prefix(request.get_full_path(),  urlsplit(settings.GEOSERVER_BASE_URL).path)
+    url = "".join([settings.GEOSERVER_BASE_URL,  path])
+
+    response, content = http.request(
+        url, request.method,
+        body=request.raw_post_data or None)
+
+    return HttpResponse(
+        content=content,
+        status=response.status,
+        mimetype=response.get("content-type", "text/plain"))
 
 @csrf_exempt
 def geoserver_rest_proxy(request, proxy_path, downstream_path):

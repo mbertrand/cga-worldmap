@@ -74,6 +74,8 @@ setup(name='GeoNode',
       data_files=data_files,
       install_requires=[
         # native dependencies
+        "gsconfig==1.0wm",
+        "django-geoexplorer==3.0.2.wm35dd99db",
         "PIL",
         "lxml",
         # python dependencies
@@ -117,8 +119,6 @@ setup(name='GeoNode',
         "transifex-client",
         #PostGIS/PostgreSQL
         "psycopg2==2.4.1",
-        "-e git+https://github.com/cga-harvard/gsconfig.py.git#egg=gsconfig.py"
-        "-e git+https://github.com/cga-harvard/django-geoexplorer==3.0.2.devdc5e859e",
         "boto",
         #For scheduled tasks
         "django-celery",
@@ -130,6 +130,10 @@ setup(name='GeoNode',
         "jdcal",
         #For mapnotes
         "vectorformats",        
+        ],
+        dependency_links = [
+        "https://github.com/cga-harvard/gsconfig.py/tarball/master#egg=gsconfig-1.0wm",
+        "https://github.com/cga-harvard/django-geoexplorer/tarball/master#egg=django-geoexplorer-3.0.2.wm35dd99db",
         ],
       zip_safe=False,
       )

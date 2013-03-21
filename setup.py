@@ -77,7 +77,6 @@ setup(name='GeoNode',
         "PIL",
         "lxml",
         # python dependencies
-        "gsconfig==0.6.1",
         "OWSLib==0.6.1",
         "Django==1.4.3",
         "httplib2>=0.7",
@@ -91,7 +90,6 @@ setup(name='GeoNode',
         "django-friendly-tag-loader==1.1",
         "django-taggit==0.9.3",
         "django-taggit-templatetags",
-        "django-geoexplorer==3.0.2.devdc5e859e",
         "django-user-accounts==1.0b7",
         "django-relationships==0.3.2",
         "django-notification==1.0",
@@ -117,6 +115,21 @@ setup(name='GeoNode',
         "MultipartPostHandler",
         # translation
         "transifex-client",
+        #PostGIS/PostgreSQL
+        "psycopg2==2.4.1",
+        "-e git+https://github.com/cga-harvard/gsconfig.py.git#egg=gsconfig.py"
+        "-e git+https://github.com/cga-harvard/django-geoexplorer==3.0.2.devdc5e859e",
+        "boto",
+        #For scheduled tasks
+        "django-celery",
+        "django-kombu",
+        "pytz",
+        #For gazetteer
+        "python-dateutil==1.5", #For Python < 3.0
+        "datautil",
+        "jdcal",
+        #For mapnotes
+        "vectorformats",        
         ],
       zip_safe=False,
       )

@@ -2502,6 +2502,26 @@ def _create_new_user(user_email, map_layer_title, map_layer_url, map_layer_owner
 
 
 
+def _create_dvn_user(user_email):
+    random_password = User.objects.make_random_password()
+    user_name = re.sub(r'\W', r'', user_email.split('@')[0])
+    user_length = len(user_name)
+    if user_length > 30:
+        user_name = user_name[0:29]
+    while len(User.objects.filter(username=user_name)) > 0:
+        user_name = user_name[0:user_length-4] + User.objects.make_random_password(length=4, allowed_chars='0123456789')
+
+    new_user = RegistrationProfile.objects.create_inactive_user(username=user_name, email=user_email, password=random_password, site = settings.SITE_ID, send_email=False)
+    if new_user:
+        try:
+            _send_permissions_email(user_email, None, None, None, random_password)
+        except:
+            logger.debug("An error ocurred when sending the mail")
+    return new_user
+
+
+
+
 def _send_permissions_email(user_email, map_layer_title, map_layer_url, map_layer_owner_id,  password):
 
     current_site = Site.objects.get_current()

@@ -142,6 +142,7 @@ INSTALLED_APPS = (
     #'geonode.hoods',
     #'geonode.gazetteer',
     #'debug_toolbar',
+    'geonode.dvn',
 
 )
 LOGGING = {
@@ -517,3 +518,4 @@ CSRF_COOKIE_HTTPONLY = True
 
 OGP_URL = ""
 
+DVN_TOKEN = "JdPGVSga9yM8gt74ZpLp"

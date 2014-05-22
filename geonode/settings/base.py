@@ -142,6 +142,7 @@ INSTALLED_APPS = (
     #'geonode.hoods',
     #'geonode.gazetteer',
     #'debug_toolbar',
+    'geonode.dvn',
 
 )
 LOGGING = {

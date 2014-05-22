@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 import threading
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
 from django.db import models
 from geoserver.resource import FeatureType
 from owslib.csw import CatalogueServiceWeb
@@ -29,8 +31,6 @@ from django.core.cache import cache
 import sys
 import re
 from geonode.maps.encode import despam, XssCleaner
-
-
 
 logger = logging.getLogger("geonode.maps.models")
 
@@ -622,6 +622,9 @@ class Contact(models.Model):
     The last time the object was modified.
     """
 
+    @property
+    def class_name(self):
+        return self.__class__.__name__
 
     def clean(self):
         # the specification says that either name or organization should be provided
@@ -635,6 +638,7 @@ class Contact(models.Model):
     def get_absolute_url(self):
         return ('profiles_profile_detail', (), { 'username': self.user.username })
     get_absolute_url = models.permalink(get_absolute_url)
+
 
     def __unicode__(self):
         return u"%s (%s)" % (self.name if self.name else self.user.username, self.organization)
@@ -2478,3 +2482,4 @@ class LayerStats(models.Model):
     uniques = models.IntegerField(_("Unique Visitors"), default = 0)
     downloads = models.IntegerField(_("Downloads"), default = 0)
     last_modified = models.DateTimeField(auto_now=True, null=True)
+

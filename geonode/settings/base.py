@@ -127,7 +127,6 @@ INSTALLED_APPS = (
     'djcelery',
     'kombu.transport.django',
 
-
     # GeoNode internal apps
     'geonode.core',
     'geonode.maps',
@@ -139,6 +138,7 @@ INSTALLED_APPS = (
     'geonode.queue',
     'geonode.certification',
     'geonode.contrib.services',
+    'geonode.dvn',
     #'geonode.hoods',
     #'geonode.gazetteer',
     #'debug_toolbar',
@@ -516,4 +516,6 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
 OGP_URL = ""
+
+DVN_TOKEN = "JdPGVSga9yM8gt74ZpLp"
 

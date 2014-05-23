@@ -1,0 +1,3 @@
+-r base.txt
+
+#-e git+https://github.com/robhudson/django-debug-toolbar.git#egg=django-debug-toolbar

@@ -1,78 +1,85 @@
-# -*- coding: utf-8 -*-
-#########################################################################
-#
-# Copyright (C) 2012 OpenPlans
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-#########################################################################
-
-from django.http import HttpResponse
 from httplib import HTTPConnection, HTTPSConnection
 from urlparse import urlsplit
 import httplib2
 import urllib
-from django.utils import simplejson as json
+import json
+import logging
+
+from xml.etree.ElementTree import XML, ParseError
+from django.http import HttpResponse
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
-import logging
-from urlparse import urlparse
-from geonode.layers.models import Layer
-from geonode.worldmap.stats.models import LayerStats
-import re
-import random
-from geonode.utils import ogc_server_settings
 
+from geonode.geoserver.helpers import ogc_server_settings
+from geonode.maps.models import Layer
+
+import re
 
 logger = logging.getLogger("geonode.proxy.views")
 
 HGL_URL = 'http://hgl.harvard.edu:8080/HGL'
 
+_valid_tags = "\{http\:\/\/www\.opengis\.net\/wms\}WMS_Capabilities|WMT_MS_Capabilities|WMS_DescribeLayerResponse|\{http\:\/\/www\.opengis\.net\/gml\}FeatureCollection|msGMLOutput|\{http\:\/\/www.opengis\.net\/wfs\}FeatureCollection"
+
+
+
 @csrf_exempt
 def proxy(request):
     if 'url' not in request.GET:
         return HttpResponse(
-                "The proxy service requires a URL-encoded URL as a parameter.",
-                status=400,
-                content_type="text/plain"
-                )
+            "The proxy service requires a URL-encoded URL as a parameter.",
+            status=400,
+            content_type="text/plain"
+        )
 
     url = urlsplit(request.GET['url'])
+
+    # Don't allow localhost connections unless in DEBUG mode
+    if not settings.DEBUG and not re.search('localhost|127.0.0.1', url.hostname):
+        return HttpResponse(status=403)
+
     locator = url.path
     if url.query != "":
         locator += '?' + url.query
     if url.fragment != "":
         locator += '#' + url.fragment
 
+    # Strip all headers and cookie info
     headers = {}
-    if settings.SESSION_COOKIE_NAME in request.COOKIES:
-        headers["Cookie"] = request.META["HTTP_COOKIE"]
 
-    if request.method in ("POST", "PUT") and "CONTENT_TYPE" in request.META:
-        headers["Content-Type"] = request.META["CONTENT_TYPE"]
 
     conn = HTTPConnection(url.hostname, url.port) if url.scheme == "http" else HTTPSConnection(url.hostname, url.port)
-    conn.request(request.method, locator, request.raw_post_data, headers)
+    conn.request(request.method, locator, request.body, headers)
     result = conn.getresponse()
+
     response = HttpResponse(
-            result.read(),
-            status=result.status,
-            content_type=result.getheader("Content-Type", "text/plain")
-            )
+        valid_response(result.read()),
+        status=result.status,
+        content_type=result.getheader("Content-Type", "text/plain")
+    )
     return response
+
+
+def valid_response(responseContent):
+    #Proxy should only be used when expecting an XML or JSON response
+
+    if responseContent[0] == "<":
+        try:
+            from defusedxml.ElementTree import fromstring, tostring
+            et = fromstring(responseContent)
+            return tostring(et)
+        except ParseError:
+            return None
+    elif re.match('\[|\{', responseContent):
+        try:
+            json.loads(responseContent)
+            return responseContent
+        except:
+            return None
+    return None
+
+
 
 @csrf_exempt
 def geoserver_rest_proxy(request, proxy_path, downstream_path):
@@ -87,10 +94,10 @@ def geoserver_rest_proxy(request, proxy_path, downstream_path):
         return path[len(prefix):]
 
     path = strip_prefix(request.get_full_path(), proxy_path)
-    url = "".join([ogc_server_settings.LOCATION, downstream_path, path])
+    url = "".join([settings.GEOSERVER_BASE_URL, downstream_path, path])
 
     http = httplib2.Http()
-    http.add_credentials(*(ogc_server_settings.credentials))
+    http.add_credentials(*settings.GEOSERVER_CREDENTIALS)
     headers = dict()
 
     if request.method in ("POST", "PUT") and "CONTENT_TYPE" in request.META:
@@ -98,17 +105,8 @@ def geoserver_rest_proxy(request, proxy_path, downstream_path):
 
     response, content = http.request(
         url, request.method,
-        body=request.body or None,
+        body=request.raw_post_data or None,
         headers=headers)
-        
-    # we need to sync django here
-    # we should remove this geonode dependence calling layers.views straigh
-    # from GXP, bypassing the proxy
-    if downstream_path == 'rest/styles' and len(request.raw_post_data)>0:
-        # for some reason sometime gxp sends a put with empty request
-        # need to figure out with Bart
-        from geonode.layers import utils
-        utils.style_update(request, url)
 
     return HttpResponse(
         content=content,
@@ -164,7 +162,7 @@ def hglpoints (request):
         pass
     query = request.GET['q'] if request.method == 'GET' else request.POST['q']
     url = url + "&UserQuery=" + urllib.quote(query.encode('utf-8')) #+ \
-        #"&BBSearchOption=1&minx=" + bbox[0] + "&miny=" + bbox[1] + "&maxx=" + bbox[2] + "&maxy=" + bbox[3]
+    #"&BBSearchOption=1&minx=" + bbox[0] + "&miny=" + bbox[1] + "&maxx=" + bbox[2] + "&maxy=" + bbox[3]
     dom = minidom.parse(urllib.urlopen(url))
     iterator = 1
     for node in dom.getElementsByTagName('item'):
@@ -174,7 +172,7 @@ def hglpoints (request):
             title = node.getElementsByTagName('title')[0]
             if guid.firstChild.data != 'OWNER.TABLE_NAME':
                 description.firstChild.data = description.firstChild.data + '<br/><br/><p><a href=\'javascript:void(0);\' onClick=\'app.addHGL("' \
-                    + escape(title.firstChild.data) + '","' + re.sub("SDE\d?\.","", guid.firstChild.data)  + '");\'>Add to Map</a></p>'
+                                              + escape(title.firstChild.data) + '","' + re.sub("SDE\d?\.","", guid.firstChild.data)  + '");\'>Add to Map</a></p>'
             iterator +=1
         else:
             node.parentNode.removeChild(node)
@@ -193,7 +191,6 @@ def hglServiceStarter (request, layer):
     startUrl = HGL_URL + "/RemoteServiceStarter?ValidationKey=" + settings.HGL_VALIDATION_KEY + "&AddLayer=" + layer
     return HttpResponse(urllib.urlopen(startUrl).read())
 
-
 def tweetServerProxy(request,geopsip):
     url = urlsplit(request.get_full_path())
     if geopsip == "standard":
@@ -203,7 +200,7 @@ def tweetServerProxy(request,geopsip):
     identifyQuery = re.search("QUERY_LAYERS", tweet_url)
 
     if identifyQuery is not None:
-        if re.search("%20limit%2010", tweet_url)is None:
+        if re.search("%20limit%2010&", tweet_url)is None:
             return HttpResponse(status=403)
 
     step1 = urllib.urlopen(tweet_url)
@@ -246,58 +243,8 @@ def tweetTrendProxy (request):
 
     tweetUrl = "http://" + settings.AWS_INSTANCE_IP + "/?agg=trend&bounds=" + request.POST["bounds"] + "&dateStart=" + request.POST["dateStart"] + "&dateEnd=" + request.POST["dateEnd"];
     resultJSON =""
-#    resultJSON = urllib.urlopen(tweetUrl).read()
-#    import datetime
-#
-#
-#    startDate = datetime.datetime.strptime(request.POST["dateStart"], "%Y-%b-%d")
-#    endDate = datetime.datetime.strptime(request.POST["dateEnd"], "%Y-%b-%d")
-#
-#    recString = "record: ["
-#
-#    while startDate <= endDate:
-#            recString += "{'date': '$date', 'Ebola$rnd5' : $rnd6, 'Malaria$rnd4' : $rnd7, 'Influenza$rnd3': $rnd8, 'Plague$rnd3': $rnd9, 'Lyme_Disease$rnd1': $rnd10},"
-#            recString = recString.replace("$rnd6", str(random.randrange(50,500,1)))
-#            recString = recString.replace("$rnd7", str(random.randrange(50,500,1)))
-#            recString = recString.replace("$rnd8", str(random.randrange(50,500,1)))
-#            recString = recString.replace("$rnd9", str(random.randrange(50,500,1)))
-#            recString = recString.replace("$rnd10", str(random.randrange(50,500,1)))
-#            recString = recString.replace("$date", datetime.datetime.strftime(startDate, '%b-%d-%Y'))
-#            startDate = startDate + datetime.timedelta(days=1)
-#
-#    recString += "]"
-#
-#    resultJSON = """
-#    {
-#    metaData: {
-#        root: "record",
-#        fields: [
-#            {name: 'date'},
-#            {name: 'Ebola$rnd5'},
-#            {name: 'Malaria$rnd4'},
-#            {name: 'Influenza$rnd3'},
-#            {name: 'Plague$rnd3'},
-#            {name: 'Lyme_Disease$rnd1'}
-#        ],
-#    },
-#    // Reader's configured root
-#    $recString
-#}
-#"""
-#
-#    resultJSON = resultJSON.replace("$recString", recString)
-#
-#
-#
-#    resultJSON = resultJSON.replace("$rnd1", str(random.randrange(50,500,1)))
-#    resultJSON = resultJSON.replace("$rnd2", str(random.randrange(50,500,1)))
-#    resultJSON = resultJSON.replace("$rnd3", str(random.randrange(50,500,1)))
-#    resultJSON = resultJSON.replace("$rnd4", str(random.randrange(50,500,1)))
-#    resultJSON = resultJSON.replace("$rnd5", str(random.randrange(50,500,1)))
-
-#    resultJSON = '{"metaData":{"fields":[{"name":"Tuberculosis"},{"name":"STD"},{"name":"Gastroenteritis"},{"name":"Influenza"},{"name":"Common_Cold"},{"name":"date"}],"root":"record"},"record":[{"Common_Cold":18,"Gastroenteritis":104,"Influenza":76,"STD":121,"Tuberculosis":236,"date":"2012-01-26"},{"Common_Cold":19,"Gastroenteritis":115,"Influenza":114,"STD":146,"Tuberculosis":397,"date":"2012-01-27"},{"Common_Cold":26,"Gastroenteritis":104,"Influenza":83,"STD":137,"Tuberculosis":402,"date":"2012-01-28"},{"Common_Cold":25,"Gastroenteritis":96,"Influenza":76,"STD":141,"Tuberculosis":358,"date":"2012-01-29"},{"Common_Cold":30,"Gastroenteritis":106,"Influenza":87,"STD":158,"Tuberculosis":372,"date":"2012-01-30"},{"Common_Cold":12,"Gastroenteritis":74,"Influenza":44,"STD":116,"Tuberculosis":222,"date":"2012-01-31"}]}'
-
     return HttpResponse(resultJSON, mimetype="application/json")
+
 
 def youtube(request):
     url = "http://gdata.youtube.com/feeds/api/videos?v=2&prettyprint=true&"
@@ -324,54 +271,26 @@ def youtube(request):
     feed_response = urllib.urlopen(url).read()
     return HttpResponse(feed_response, mimetype="text/xml")
 
-def download(request, service):
-    
-
-    h = httplib2.Http()
-    GEOSERVER_USER, GEOSERVER_PASSWD = ogc_server_settings.USER, ogc_server_settings.PASSWORD
-    h.add_credentials(GEOSERVER_USER, GEOSERVER_PASSWD)
-    _netloc = urlparse(ogc_server_settings.DOWNLOAD_URL).netloc
-    h.authorizations.append(httplib2.BasicAuthentication(
-        (GEOSERVER_USER, GEOSERVER_PASSWD),
-        _netloc,
-        ogc_server_settings.DOWNLOAD_URL,
-        {},
-        None,
-        None,
-        h
-        )
-    )
-
-    
+def download(request, service, layer, format):
     params = request.GET
     #mimetype = params.get("outputFormat") if service == "wfs" else params.get("format")
 
-    url = ogc_server_settings.DOWNLOAD_URL + service + "?" + params.urlencode()
-    layer = params["layers"] if "layers" in params else params["typename"]
+    http = httplib2.Http()
+    http.add_credentials(*(ogc_server_settings.credentials))
+    headers = dict()
 
-    if "format" in params:
-        format = params["format"]
-    elif "outputFormat" in params:
-        format = params["outputFormat"]
-    elif "mode" in params:
-        format = "kml"
-    else:
-        format = "unknown"
+    service=service.replace("_","/")
+    url = settings.GEOSERVER_BASE_URL + service + "?" + params.urlencode()
 
-    if "/" in format:
-        format = format.split("/")[1]
+    layerObj = Layer.objects.get(pk=layer)
 
-    format = format.replace("excel","xls").replace("gml2","xml")
+    if layerObj.downloadable and request.user.has_perm('maps.view_layer', obj=layerObj):
 
-    layer_obj = Layer.objects.get(typename=layer)
+        # layerstats,created = LayerStats.objects.get_or_create(layer=layer)
+        # layerstats.downloads += 1
+        # layerstats.save()
 
-    if layer_obj.downloadable and request.user.has_perm('layers.view_layer', obj=layer_obj):
-
-        layerstats,created = LayerStats.objects.get_or_create(layer=layer_obj)
-        layerstats.downloads += 1
-        layerstats.save()
-
-        download_response, content = h.request(
+        download_response, content = http.request(
             url, request.method,
             body=None,
             headers=dict())
@@ -383,45 +302,7 @@ def download(request, service):
         if content_disposition is not None:
             response['Content-Disposition'] = content_disposition
         else:
-            response['Content-Disposition'] = "attachment; filename=" + layer_obj.name + "." + format
+            response['Content-Disposition'] = "attachment; filename=" + layerObj.name + "." + format
         return response
     else:
         return HttpResponse(status=403)
-
-
-def tweetServerProxy(request):
-    url = urlsplit(request.get_full_path())
-    tweet_url = "http://" + settings.GEOPS_IP + "?" + url.query
-
-    step1 = urllib.urlopen(tweet_url)
-    step2 = step1.read()
-    response = HttpResponse(step2, mimetype= step1.info().dict['content-type'])
-    try :
-        cookie = step1.info().dict['set-cookie'].split(";")[0].split("=")[1]
-        response.set_cookie("tweet_count", cookie)
-    except:
-        pass
-    return response
-
-
-def tweetDownload (request):
-
-    if (not request.user.is_authenticated() or  not request.user.get_profile().is_org_member):
-        return HttpResponse(status=403)
-
-    proxy_url = urlsplit(request.get_full_path())
-    download_url = "http://" + settings.GEOPS_IP + "?" + proxy_url.query  + settings.GEOPS_DOWNLOAD
-
-    http = httplib2.Http()
-    response, content = http.request(
-        download_url, request.method)
-
-    response =  HttpResponse(
-        content=content,
-        status=response.status,
-        mimetype=response.get("content-type", "text/plain"))
-
-    response['Content-Disposition'] = response.get('Content-Disposition', 'attachment; filename="tweets"' + request.user.username + '.csv');
-    return response
-
-

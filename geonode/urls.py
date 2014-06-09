@@ -125,7 +125,7 @@ if 'geonode.geoserver' in settings.INSTALLED_APPS:
     )
 
 # Set up proxy
-urlpatterns += geonode.proxy.urls.urlpatterns
+urlpatterns += geonode.worldmap.proxy.urls.urlpatterns
 
 
 # Serve static files
@@ -135,8 +135,8 @@ handler403 = 'geonode.views.err403'
 
 #official site patterns
 urlpatterns += patterns('',
-                                      (r'^tweetmap/$', 'geonode.worldmap.maps.views.tweetview'),
-                                      (r'^(?P<site>[A-Za-z0-9_\-]+)/$', 'geonode.worldmap.maps.views.official_site'),
-                                      (r'^(?P<site>[A-Za-z0-9_\-]+)/mobile/?$', 'geonode.worldmap.maps.views.official_site_mobile'),
-                                      (r'^(?P<site>[A-Za-z0-9_\-]+)/info$', 'geonode.worldmap.maps.views.official_site_info'),
-                                      )
+    (r'^tweetmap/$', 'geonode.worldmap.maps.views.tweetview'),
+    (r'^(?P<site>[A-Za-z0-9_\-]+)/$', 'geonode.worldmap.maps.views.official_site'),
+    (r'^(?P<site>[A-Za-z0-9_\-]+)/mobile/?$', 'geonode.worldmap.maps.views.official_site_mobile'),
+    (r'^(?P<site>[A-Za-z0-9_\-]+)/info$', 'geonode.worldmap.maps.views.official_site_info'),
+)

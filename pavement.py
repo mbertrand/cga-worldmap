@@ -86,8 +86,13 @@ def setup_geonode_sdk(options):
         z.extractall()
             
     sh("rm -rf %s/build/" % worldmap_client)
-    sh("ant -f %s/build.xml -Dapp.path=../%s -Dsdk.build=geonode/static -Dapp.name=sdk package" % (sdk_dir,worldmap_client))
+    sh("ant -f opengeosuite-4.0-sdk/build.xml -Dapp.path=../worldmap-client -Dsdk.build=../geonode/static -Dapp.name=sdk package")
 
+
+@task
+@needs(['setup_geonode_sdk',])
+def debug_geonode_sdk(options):
+    sh("ant -f opengeosuite-4.0-sdk/build.xml -Dapp.path=../worldmap-client -Dsdk.build=../geonode/static -Dapp.name=sdk debug")
 
 @task
 @cmdopts([
@@ -159,6 +164,7 @@ def setup(options):
     info(('GeoNode development environment successfully set up.'
           'If you have not set up an administrative account,'
           ' please do so now. Use "paver start" to start up the server.'))
+
 
 
 @cmdopts([

@@ -165,7 +165,7 @@ def geoserver_post_save(instance, sender, **kwargs):
 
     # Set download links for WMS, WCS or WFS and KML
 
-    links = wms_links(ogc_server_settings.public_url + 'wms?',
+    links = wms_links(settings.SITEURL + 'download/wms?',
                     instance.typename.encode('utf-8'), instance.bbox_string,
                     instance.srid, height, width)
 
@@ -181,7 +181,7 @@ def geoserver_post_save(instance, sender, **kwargs):
                         )
 
     if instance.storeType == "dataStore":
-        links = wfs_links(ogc_server_settings.public_url + 'wfs?', instance.typename.encode('utf-8'))
+        links = wfs_links(settings.SITEURL + 'download/wfs?', instance.typename.encode('utf-8'))
         for ext, name, mime, wfs_url in links:
             if mime=='SHAPE-ZIP':
                 name = 'Zipped Shapefile'
@@ -213,7 +213,7 @@ def geoserver_post_save(instance, sender, **kwargs):
             logger.warn(msg, e)
         else:
 
-            links = wcs_links(ogc_server_settings.public_url + 'wcs?', instance.typename.encode('utf-8'),
+            links = wcs_links(settings.SITEURL + 'download/wcs?', instance.typename.encode('utf-8'),
                           bbox=gs_resource.native_bbox[:-1],
                           crs=gs_resource.native_bbox[-1],
                           height=str(covHeight), width=str(covWidth))
@@ -232,7 +232,7 @@ def geoserver_post_save(instance, sender, **kwargs):
         instance.set_gen_level(ANONYMOUS_USERS,permissions['anonymous'])
         instance.set_gen_level(AUTHENTICATED_USERS,permissions['authenticated'])
 
-    kml_reflector_link_download = ogc_server_settings.public_url + "wms/kml?" + urllib.urlencode({
+    kml_reflector_link_download = settings.SITEURL + "download/wms_kml?" + urllib.urlencode({
         'layers': instance.typename.encode('utf-8'),
         'mode': "download"
     })
@@ -247,7 +247,7 @@ def geoserver_post_save(instance, sender, **kwargs):
                         )
                     )
 
-    kml_reflector_link_view = ogc_server_settings.public_url + "wms/kml?" + urllib.urlencode({
+    kml_reflector_link_view = settings.SITEURL + "download/wms_kml?" + urllib.urlencode({
         'layers': instance.typename.encode('utf-8'),
         'mode': "refresh"
     })

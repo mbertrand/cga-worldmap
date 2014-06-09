@@ -271,7 +271,7 @@ def youtube(request):
     feed_response = urllib.urlopen(url).read()
     return HttpResponse(feed_response, mimetype="text/xml")
 
-def download(request, service, layer, format):
+def download(request, service):
     params = request.GET
     #mimetype = params.get("outputFormat") if service == "wfs" else params.get("format")
 
@@ -279,12 +279,26 @@ def download(request, service, layer, format):
     http.add_credentials(*(ogc_server_settings.credentials))
     headers = dict()
 
-    service=service.replace("_","/")
-    url = settings.GEOSERVER_BASE_URL + service + "?" + params.urlencode()
+    url = ogc_server_settings.DOWNLOAD_URL + service + "?" + params.urlencode()
+    layer = params["layers"] if "layers" in params else params["typename"]
 
-    layerObj = Layer.objects.get(pk=layer)
+    if "format" in params:
+        format = params["format"]
+    elif "outputFormat" in params:
+        format = params["outputFormat"]
+    elif "mode" in params:
+        format = "kml"
+    else:
+        format = "unknown"
 
-    if layerObj.downloadable and request.user.has_perm('maps.view_layer', obj=layerObj):
+    if "/" in format:
+        format = format.split("/")[1]
+
+    format = format.replace("excel","xls").replace("gml2","xml")
+
+    layer_obj = Layer.objects.get(typename=layer)
+
+    if layer_obj.downloadable and request.user.has_perm('layers.view_layer', obj=layer_obj):
 
         # layerstats,created = LayerStats.objects.get_or_create(layer=layer)
         # layerstats.downloads += 1
@@ -302,7 +316,7 @@ def download(request, service, layer, format):
         if content_disposition is not None:
             response['Content-Disposition'] = content_disposition
         else:
-            response['Content-Disposition'] = "attachment; filename=" + layerObj.name + "." + format
+            response['Content-Disposition'] = "attachment; filename=" + layer_obj.name + "." + format
         return response
     else:
         return HttpResponse(status=403)

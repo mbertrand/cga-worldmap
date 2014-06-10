@@ -99,8 +99,12 @@ def _resolve_map(request, id, permission='maps.change_map',
     '''
     Resolve the Map by the provided typename and check the optional permission.
     '''
-    return resolve_object(request, Map, {'pk':id}, permission = permission,
+    if id.isdigit():
+        return resolve_object(request, Map, {'pk':id}, permission = permission,
                           permission_msg=msg, **kwargs)
+    else:
+        return resolve_object(request, Map, {'urlsuffix':id}, permission = permission,
+                              permission_msg=msg, **kwargs)
 
 #### BASIC MAP VIEWS ####
 

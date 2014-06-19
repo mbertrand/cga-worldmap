@@ -253,7 +253,6 @@ INSTALLED_APPS = (
     'django_extensions',
     'modeltranslation',
     'autocomplete_light',
-    'haystack',
     'tastypie',
     'polymorphic',
 
@@ -485,7 +484,7 @@ OGC_SERVER = {
         'BACKEND_WRITE_ENABLED': True,
         'WPS_ENABLED' : True,
         # Set to name of database in DATABASES dictionary to enable
-        'DATASTORE': '', #'datastore',
+        'DATASTORE':  'wmdata',
         'DOWNLOAD_URL' : 'http://localhost:8080/geoserver/',
         'TIMEOUT': 10  # number of seconds to allow for HTTP requests
     }
@@ -766,23 +765,6 @@ PROXY_ALLOWED_HOSTS = ()
 
 # The proxy to use when making cross origin requests.
 PROXY_URL = '/proxy/?url=' if DEBUG else None
-
-# Haystack Search Backend Configuration.  To enable, first install the following:
-# - pip install django-haystack
-# - pip install pyelasticsearch
-# Set HAYSTACK_SEARCH to True
-# Run "python manage.py rebuild_index"
-
-HAYSTACK_SEARCH = False
-HAYSTACK_CONNECTIONS = {
-    'default': {
-        'ENGINE': 'haystack.backends.elasticsearch_backend.ElasticsearchSearchEngine',
-        'URL': 'http://127.0.0.1:9200/',
-        'INDEX_NAME': 'worldmap',
-        },
-    }
-HAYSTACK_SIGNAL_PROCESSOR = 'haystack.signals.RealtimeSignalProcessor'
-HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
 
 # Available download formats
 DOWNLOAD_FORMATS_METADATA = [

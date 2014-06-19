@@ -44,7 +44,7 @@ CONSTRAINT_OPTIONS = [
 
 class LayerCategoryChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return '<a href="#" onmouseover=\'javascript:showModal("' + escape(obj.description) + '")\' onmouseout=\'javascript:hideModal()\';return false;\'>' + obj.gn_description + '</a>'
+        return '<a href="#" onmouseover=\'javascript:https://github.com/mbertrand/cga-worldmap/blob/gn20upgrade-merge/geonode/worldmap/templates/upload/layer_upload.html#L126showModal("' + escape(obj.description) + '")\' onmouseout=\'javascript:hideModal()\';return false;\'>' + obj.gn_description + '</a>'
 
 
 class LayerCategoryForm(forms.Form):

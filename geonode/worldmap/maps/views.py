@@ -310,8 +310,7 @@ def mobilemap(request, mapid=None, snapshot=None):
     return render_to_response('maps/mobilemap.html', RequestContext(request, {
         'config': json.dumps(config),
         'GOOGLE_API_KEY' : settings.GOOGLE_API_KEY,
-        'GEONETWORK_BASE_URL' : settings.GEONETWORK_BASE_URL,
-        'GEOSERVER_BASE_URL' : settings.GEOSERVER_BASE_URL,
+        'GEOSERVER_BASE_URL' : ogc_server_settings.public_url,
         'DB_DATASTORE' : ogc_server_settings.DATASTORE,
         'maptitle': map_obj.title,
         'urlsuffix': get_suffix_if_custom(map_obj),

@@ -585,3 +585,31 @@ def maplayer_attributes(request, layername):
     #Return custom layer attribute labels/order in JSON format
     layer = Layer.objects.get(typename=layername)
     return HttpResponse(json.dumps(layer.attribute_config()), mimetype="application/json")
+
+def map_mobile(request, mapid=None):
+    if mapid is None:
+        return new_map(request);
+    else:
+        if mapid.isdigit():
+            map_obj = Map.objects.get(pk=mapid)
+        else:
+            map_obj = Map.objects.get(urlsuffix=mapid)
+
+        if not request.user.has_perm('maps.view_map', obj=map_obj):
+            return HttpResponse(_("Not Permitted"), status=401, mimetype="text/plain")
+        #if snapshot is None:
+        #    config = map_obj.viewer_json(request.user)
+        #else:
+        #    config = snapshot_config(snapshot, map_obj, request.user)
+        config = map_obj.viewer_json()
+
+        first_visit_mobile = True
+        if request.session.get('visit_mobile' + str(map_obj.id), False):
+            first_visit_mobile = False
+        else:
+            request.session['visit_mobile' + str(map_obj.id)] = True
+        config['first_visit_mobile'] = first_visit_mobile
+        
+    return render_to_response('maps/map_mobile.html', RequestContext(request, {
+        'config': json.dumps(config),
+    }))

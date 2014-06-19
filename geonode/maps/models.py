@@ -274,9 +274,12 @@ class Map(ResourceBase, GXPMapBase):
         Returns layer group name from local OWS for this map instance.
         """
         if 'geonode.geoserver' in settings.INSTALLED_APPS:
-            from geonode.geoserver.helpers import gs_catalog
-            lg_name = '%s_%d' % (slugify(self.title), self.id)
-            return gs_catalog.get_layergroup(lg_name)
+            try:
+                from geonode.geoserver.helpers import gs_catalog
+                lg_name = '%s_%d' % (slugify(self.title), self.id)
+                return gs_catalog.get_layergroup(lg_name)
+            except:
+                return None
         else:
             return None
 

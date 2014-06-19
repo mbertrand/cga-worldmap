@@ -1,0 +1,22 @@
+<script src="{{ STATIC_URL }}geonode/js/extjs/ViewerMobile.js"></script>
+<script type="text/javascript">
+  Ext.Ajax.defaultHeaders = { 'X-CSRFToken': '{{ csrf_token|escapejs }}' };
+  Ext.BLANK_IMAGE_URL = "{{ STATIC_URL }}geoexplorer/externals/ext/resources/images/default/s.gif";
+</script>
+
+<script type="text/javascript">
+//Reset SLD defaults for symbolizer, because for some reason 
+// it otherwise wreaks havoc with touch dragging
+
+OpenLayers.Renderer.defaultSymbolizer = {
+        fillColor: "#000000",
+        strokeColor: "#000000",
+        strokeWidth: 2,
+        fillOpacity: 1,
+        strokeOpacity: 1,
+        pointRadius: 0,
+        labelAlign: 'cm'
+};
+
+
+</script>

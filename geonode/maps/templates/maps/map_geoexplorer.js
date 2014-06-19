@@ -57,12 +57,12 @@ Ext.onReady(function() {
 
 
     app = new GeoNode.Composer(config);
-    app.mapPanel.map.addControl(
-        new OpenLayers.Control.MousePosition(
-            { numDigits: 2,
-              displayProjection: new OpenLayers.Projection("EPSG:4326")}
-        )
-    );
+//    app.mapPanel.map.addControl(
+//        new OpenLayers.Control.MousePosition(
+//            { numDigits: 2,
+//              displayProjection: new OpenLayers.Projection("EPSG:4326")}
+//        )
+//    );
 {% endautoescape %}
 });
 </script>

@@ -29,7 +29,10 @@ import worldmap.urls
 
 from geonode.api.urls import api
 
+import autocomplete_light
+
 # Setup Django Admin
+autocomplete_light.autodiscover()
 from django.contrib import admin
 admin.autodiscover()
 
@@ -81,7 +84,7 @@ urlpatterns += patterns('',
                                        name='account_ajax_login'),
     url(r'^account/ajax_lookup$', 'geonode.views.ajax_lookup',
                                        name='account_ajax_lookup'),
-    url(r'^security/permissions/(?P<type>[^/]*)/(?P<resource_id>\d+)$', 'geonode.security.views.resource_permissions',
+    url(r'^security/permissions/(?P<resource_id>\d+)$', 'geonode.security.views.resource_permissions',
                                        name='resource_permissions'),
 
     # Meta
@@ -91,24 +94,12 @@ urlpatterns += patterns('',
     url(r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
                                   {'sitemaps': sitemaps}, name='sitemap'),
     (r'^i18n/', include('django.conf.urls.i18n')),
+    (r'^autocomplete/', include('autocomplete_light.urls')),
     (r'^admin/', include(admin.site.urls)),
+    (r'^groups/', include('geonode.groups.urls')),
+    (r'^documents/', include('geonode.documents.urls')),
+    (r'^services/', include('geonode.services.urls')),
     url(r'', include(api.urls)),
-    )
-
-#Documents views
-if 'geonode.documents' in settings.INSTALLED_APPS:
-    urlpatterns += patterns('',
-        (r'^documents/', include('geonode.documents.urls')),
-    )
-
-if "geonode.contrib.groups" in settings.INSTALLED_APPS:
-    urlpatterns += patterns('',
-        (r'^groups/', include('geonode.contrib.groups.urls')),
-    )
-
-if "geonode.contrib.services" in settings.INSTALLED_APPS:
-    urlpatterns += patterns('',
-        (r'^services/', include('geonode.contrib.services.urls')),
     )
 
 if "geonode.contrib.dynamic" in settings.INSTALLED_APPS:
@@ -127,16 +118,15 @@ if 'geonode.geoserver' in settings.INSTALLED_APPS:
 # Set up proxy
 urlpatterns += geonode.worldmap.proxy.urls.urlpatterns
 
-
 # Serve static files
 urlpatterns += staticfiles_urlpatterns()
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 handler403 = 'geonode.views.err403'
 
-#official site patterns
+
+#Featured Maps Pattens
 urlpatterns += patterns('',
     (r'^tweetmap/$', 'geonode.worldmap.maps.views.tweetview'),
-    (r'^(?P<site>[A-Za-z0-9_\-]+)/$', 'geonode.worldmap.maps.views.official_site'),
-    (r'^(?P<site>[A-Za-z0-9_\-]+)/mobile/?$', 'geonode.worldmap.maps.views.official_site_mobile'),
-    (r'^(?P<site>[A-Za-z0-9_\-]+)/info$', 'geonode.worldmap.maps.views.official_site_info'),
+    (r'^(?P<site>[A-Za-z0-9_\-]+)/$', 'geonode.maps.views.featured_map'),
+    (r'^(?P<site>[A-Za-z0-9_\-]+)/info$', 'geonode.maps.views.featured_map_info'),
 )

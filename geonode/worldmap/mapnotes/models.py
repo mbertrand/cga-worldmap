@@ -1,11 +1,12 @@
 from django.contrib.gis.db import models
 from django.contrib.auth.models import User
+from geonode import settings
 from geonode.maps.models import Map
 from django.utils.translation import ugettext_lazy as _
 
 class MapNote(models.Model):
     geometry = models.GeometryField(srid=4326,null=True, blank=True)
-    owner = models.ForeignKey(User)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL)
     map = models.ForeignKey(Map)
     created_dttm = models.DateTimeField(auto_now_add=True)
     modified_dttm = models.DateTimeField(auto_now=True)

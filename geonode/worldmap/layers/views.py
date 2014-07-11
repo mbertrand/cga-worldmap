@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
 from django.utils.html import escape
 from geonode.people.forms import ProfileForm
-from geonode.utils import ogc_server_settings
+from geonode.geoserver.helpers import ogc_server_settings
 from geonode.base.enumerations import CHARSETS
 from geonode.base.models import TopicCategory
 from geonode.maps.models import Map, MapLayer

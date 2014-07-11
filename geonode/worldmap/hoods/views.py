@@ -11,7 +11,6 @@ from django.template import RequestContext
 import logging
 import psycopg2
 from geonode.maps.models import Map
-from geonode.maps.views import *
 from django.utils import simplejson as json
 from django.core.cache import cache
 

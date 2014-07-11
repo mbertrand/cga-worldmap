@@ -1,4 +1,5 @@
-{% extends "documents/document_base.html" %}
+{% extends "documents/document_upload_base.html" %}
+{% load bootstrap_tags %}
 {% load i18n %}
 
 {% block title %} {% trans "Upload Document" %} - {{ block.super }} {% endblock %}
@@ -13,18 +14,16 @@
 
 {% block body %}
 
-<div class="col-md-12">
-  <h2 class="page-title">{% trans "Upload Documents" %}</h2>
-<div>
-
 <div class="col-md-8">
-<form id="upload_form"  method="post" enctype="multipart/form-data" action="{% url "document_upload" %}">
-                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" />
-                    {{ form.as_table }}
-                    <div><br/><input class="btn" type="submit" value="Upload" /></div>
-                </form>
-            </div>
-        </div>
+
+  <form id="upload_form"  method="post" enctype="multipart/form-data" action="{% url "document_upload" %}">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" />
+    {{ form|as_bootstrap }}
+    <button type="submit" id="upload-button" class="btn btn-danger">Upload</button>
+  </form>
+
+</div>
+
 {% endblock %}
 
 {% block sidebar %}
@@ -39,9 +38,7 @@
 {% endblock %}
 
 {% block extra_script %}
-{% with "none" as document %}
 {% include "_permissions_form_js.html" %}
-{% endwith %}
 
 <script type="text/javascript">
     $('#id_doc_file').on('change', function(){
@@ -72,7 +69,7 @@
       });
     $('#resource').on('change',function(e){$('#resource_type').val($('#resource').select2('data').type)});
     $('#upload_form').submit(function(){
-      $('#permissions').val(JSON.stringify(permissionsString($('#permission_form'),'documents')));
+      $('#permissions').val(JSON.stringify(permissionsString($('#permission_form'),'base')));
     });
 </script>
 {% endblock extra_script %}

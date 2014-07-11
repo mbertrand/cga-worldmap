@@ -27,14 +27,12 @@ from django.db import models
 from django.db.models import signals
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 from django.core.urlresolvers import reverse
 from django.core.exceptions import MultipleObjectsReturned
 
-from geonode.base.models import ResourceBase, ResourceBaseManager, Link
-from geonode.base.models import SpatialRepresentationType, TopicCategory
-from geonode.base.models import Thumbnail
+from geonode.base.models import ResourceBase, ResourceBaseManager, Link, SpatialRepresentationType, \
+    TopicCategory, Thumbnail, resourcebase_post_save
 from geonode.people.utils import get_valid_user
 from geonode.layers.metadata import set_metadata
 from agon_ratings.models import OverallRating
@@ -79,7 +77,7 @@ class Layer(ResourceBase):
     store = models.CharField(max_length=128)
     storeType = models.CharField(max_length=128)
     name = models.CharField(max_length=128)
-    typename = models.CharField(max_length=128, unique=True, null=True, blank=True)
+    typename = models.CharField(max_length=128, null=True, blank=True)
 
     default_style = models.ForeignKey(Style, related_name='layer_default_style', null=True, blank=True)
     styles = models.ManyToManyField(Style, related_name='layer_styles')
@@ -108,38 +106,9 @@ class Layer(ResourceBase):
     charset = models.CharField(max_length=255, default='UTF-8')
 
     upload_session = models.ForeignKey('UploadSession', blank=True, null=True)
-
-    def _thumbnail_url(self, width=20, height=None):
-        """ Generate a URL representing thumbnail of the layer """
-
-        params = {
-            'layers': self.typename.encode('utf-8'),
-            'format': 'image/png8',
-            'width': width,
-        }
-        if height is not None:
-            params['height'] = height
-
-        # Avoid using urllib.urlencode here because it breaks the url.
-        # commas and slashes in values get encoded and then cause trouble
-        # with the WMS parser.
-        p = "&".join("%s=%s"%item for item in params.items())
-
-        return ogc_server_settings.LOCATION + "wms/reflect?" + p
+    service = models.ForeignKey('services.Service', null=True, blank=True, related_name='layer_set')
 
 
-    def verify(self):
-        """Makes sure the state of the layer is consistent in GeoServer and Catalogue.
-        """
-    
-        # Check the layer is in the wms get capabilities record
-        # FIXME: Implement caching of capabilities record site wide
-
-        _local_wms = get_wms()
-        record = _local_wms.contents.get(self.typename)
-        if record is None:
-            msg = "WMS Record missing for layer [%s]" % self.typename.encode('utf-8')
-            raise GeoNodeException(msg)
     def is_vector(self):
         return self.storeType == 'dataStore'
 
@@ -175,11 +144,25 @@ class Layer(ResourceBase):
 
     @property
     def ows_url(self):
-        if self.storeType == "remoteStore" and "geonode.contrib.services" in settings.INSTALLED_APPS:
-            from geonode.contrib.services.models import ServiceLayer
-            return ServiceLayer.objects.filter(layer__id=self.id)[0].service.base_url
+        if self.storeType == "remoteStore":
+            return self.service.base_url
         else:
             return settings.OGC_SERVER['default']['LOCATION'] + "wms"
+
+
+    @property
+    def ptype(self):
+        if self.storeType == "remoteStore":
+            return self.service.ptype
+        else:
+            return "gxp_wmscsource"
+
+    @property
+    def service_typename(self):
+        if self.storeType == "remoteStore":
+            return "%s:%s" % (self.service.name, self.typename)
+        else:
+            return self.typename
 
     def get_base_file(self):
         """Get the shp or geotiff file for this layer.
@@ -203,7 +186,7 @@ class Layer(ResourceBase):
 
 
     def get_absolute_url(self):
-        return reverse('layer_detail', args=(self.typename,))
+        return reverse('layer_detail', args=(self.service_typename,))
 
 
     def attribute_config(self):
@@ -219,7 +202,7 @@ class Layer(ResourceBase):
 
     def __str__(self):
         if self.typename is not None:
-            return "%s Layer" % self.typename.encode('utf-8')
+            return "%s Layer" % self.service_typename.encode('utf-8')
         elif self.name is not None:
             return "%s Layer" % self.name
         else:
@@ -255,7 +238,7 @@ class UploadSession(models.Model):
     """Helper class to keep track of uploads.
     """
     date = models.DateTimeField(auto_now=True)
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     processed = models.BooleanField(default=False)
     error = models.TextField(blank=True, null=True)
     traceback = models.TextField(blank=True, null=True)
@@ -322,7 +305,6 @@ class Attribute(models.Model):
     def unique_values_as_list(self):
         return self.unique_values.split(',')
 
-
 def pre_save_layer(instance, sender, **kwargs):
     if kwargs.get('raw', False):
         instance.owner = instance.resourcebase_ptr.owner
@@ -374,17 +356,14 @@ def pre_save_layer(instance, sender, **kwargs):
 
     instance.set_bounds_from_bbox(bbox)
 
-    try:
-        instance.thumbnail, created = Thumbnail.objects.get_or_create(resourcebase__id=instance.id)
-    except MultipleObjectsReturned:
-        instance.thumbnail = Thumbnail.objects.filter(resourcebase__id=instance.id)[0]
-
 
 def pre_delete_layer(instance, sender, **kwargs):
     """
     Remove any associated style to the layer, if it is not used by other layers.
     Default style will be deleted in post_delete_layer
     """
+    if instance.service:
+        return
     logger.debug("Going to delete the styles associated for [%s]", instance.typename.encode('utf-8'))
     ct = ContentType.objects.get_for_model(instance)
     OverallRating.objects.filter(content_type = ct, object_id = instance.id).delete()
@@ -401,20 +380,17 @@ def post_delete_layer(instance, sender, **kwargs):
     """
     from geonode.maps.models import MapLayer
     logger.debug("Going to delete associated maplayers for [%s]", instance.typename.encode('utf-8'))
-    MapLayer.objects.filter(name=instance.typename).delete()
+    MapLayer.objects.filter(name=instance.typename,ows_url=instance.ows_url).delete()
+
+    if instance.service:
+        return
     logger.debug("Going to delete the default style for [%s]", instance.typename.encode('utf-8'))
 
     if instance.default_style and Layer.objects.filter(default_style__id=instance.default_style.id).count() == 0:
         instance.default_style.delete()
 
 
-def post_save_layer(instance, sender, **kwargs):
-    """Set missing default values.
-    """
-    instance.set_missing_info()
-
-
 signals.pre_save.connect(pre_save_layer, sender=Layer)
-signals.post_save.connect(post_save_layer, sender=Layer)
+signals.post_save.connect(resourcebase_post_save, sender=Layer)
 signals.pre_delete.connect(pre_delete_layer, sender=Layer)
 signals.post_delete.connect(post_delete_layer, sender=Layer)

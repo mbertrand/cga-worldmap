@@ -21,6 +21,7 @@
 import logging
 import errno
 import uuid
+from django.contrib.auth.models import User
 from django.utils.html import escape
 import httplib2
 from urlparse import urlparse
@@ -30,22 +31,25 @@ from django.conf import settings
 from django.db import models
 from django.db.models import signals
 from django.utils import simplejson as json
-from django.contrib.auth.models import User, AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import ugettext_lazy as _
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.template.defaultfilters import slugify
+from django.core.cache import cache
+
+from guardian.shortcuts import get_anonymous_user
 
 from geonode.layers.models import Layer
-from geonode.base.models import ResourceBase
+from geonode.base.models import ResourceBase, resourcebase_post_save
 from geonode.maps.signals import map_changed_signal
-from geonode.security.enumerations import AUTHENTICATED_USERS, ANONYMOUS_USERS
 from geonode.utils import GXPMapBase
 from geonode.utils import GXPLayerBase
 from geonode.utils import layer_from_viewer_config
 from geonode.utils import default_map_config
-from geonode.encode import XssCleaner, despam, num_encode
+
+from geonode.encode import XssCleaner, despam
+from geonode.utils import num_encode, num_decode
 
 from agon_ratings.models import OverallRating
 
@@ -78,10 +82,11 @@ class Map(ResourceBase, GXPMapBase):
     # The last time the map was modified.
 
     urlsuffix = models.CharField(_('Site URL'), max_length=255, blank=True)
-    # Alphanumeric alternative to referencing maps by id, appended to end of URL instead of id, ie http://domain/maps/someview
+    # Alphanumeric alternative to referencing maps by id, appended to end of
+    # URL instead of id, ie http://domain/maps/someview
 
-    officialurl = models.CharField(_('Official Harvard Site URL'), max_length=255, blank=True)
-    # Full URL for official/sponsored map view, ie http://domain/someview
+    featuredurl = models.CharField(_('Featured Map URL'), max_length=255, blank=True)
+    # Full URL for featured map view, ie http://domain/someview
 
     content = models.TextField(_('Site Content'), blank=True, null=True)
     # HTML content to be displayed in modal window on 1st visit
@@ -220,33 +225,6 @@ class Map(ResourceBase, GXPMapBase):
     def get_absolute_url(self):
         return reverse('geonode.maps.views.map_detail', None, [str(self.id)])
 
-
-    class Meta:
-        # custom permissions,
-        # change and delete are standard in django
-        permissions = (('view_map', 'Can view'),
-                       ('change_map_permissions', "Can change permissions"), )
-
-    # Permission Level Constants
-    # LEVEL_NONE inherited
-    LEVEL_READ  = 'map_readonly'
-    LEVEL_WRITE = 'map_readwrite'
-    LEVEL_ADMIN = 'map_admin'
-
-    def set_default_permissions(self):
-        self.set_gen_level(ANONYMOUS_USERS, self.LEVEL_READ)
-        self.set_gen_level(AUTHENTICATED_USERS, self.LEVEL_READ)
-
-        # remove specific user permissions
-        current_perms = self.get_all_level_info()
-        for username in current_perms['users'].keys():
-            user = User.objects.get(username=username)
-            self.set_user_level(user, self.LEVEL_NONE)
-
-        # assign owner admin privs
-        if self.owner:
-            self.set_user_level(self.owner, self.LEVEL_ADMIN)
-
     def get_bbox_from_layers(self, layers):
         """
         Calculate the bbox from a given list of Layer objects
@@ -263,7 +241,6 @@ class Map(ResourceBase, GXPMapBase):
                 bbox[3] = max(bbox[3], layer_bbox[3])
         
         return bbox
-
 
     def create_from_layer_list(self, user, layers, title, abstract):
         self.owner = user
@@ -290,7 +267,7 @@ class Map(ResourceBase, GXPMapBase):
                 except ObjectDoesNotExist:
                     raise GeoNodeError('Could not find layer with name %s' % layer)
 
-            if not user.has_perm('layers.view_layer', obj=layer):
+            if not user.has_perm('base.view_resourcebase', obj=layer.resourcebase_ptr):
                 # invisible layer, skip inclusion or raise Exception?
                 raise GeoNodeError('User %s tried to create a map with layer %s without having premissions' % (user, layer))
             MapLayer.objects.create(
@@ -324,6 +301,7 @@ class Map(ResourceBase, GXPMapBase):
         snapshots = MapSnapshot.objects.exclude(user=None).filter(map__id=self.map.id)
         return [snapshot for snapshot in snapshots]
 
+
     def viewer_json(self, user, *added_layers):
         def uniqifydict(seq, item):
             """
@@ -350,13 +328,14 @@ class Map(ResourceBase, GXPMapBase):
 
         return config
 
+
     @property
     def is_public(self):
         """
         Returns True if anonymous (public) user can view map.
         """
-        user = AnonymousUser()
-        return user.has_perm('maps.view_map', obj=self)
+        user = get_anonymous_user()
+        return user.has_perm('base.view_resourcebase', obj=self.resourcebase_ptr)
 
     @property
     def layer_group(self):
@@ -410,6 +389,9 @@ class Map(ResourceBase, GXPMapBase):
             lg.layers, lg.styles, lg.bounds = lg_layers, lg_styles, lg_bounds
         gs_catalog.save(lg)
         return lg_name
+
+    class Meta(ResourceBase.Meta):
+        pass
 
 
 class MapLayer(models.Model, GXPLayerBase):
@@ -477,28 +459,38 @@ class MapLayer(models.Model, GXPLayerBase):
     local = models.BooleanField(default=False)
     # True if this layer is served by the local geoserver
 
-    def layer_config(self, user):
-        cfg = GXPLayerBase.layer_config(self, user)
+    def layer_config(self, user=None):
+        #Try to use existing user-specific cache of layer config
+        if self.id:
+            cfg = cache.get("layer_config" + str(self.id) + "_" + str(0 if user is None else user.id))
+            if cfg is not None:
+                return cfg
+
+        cfg = GXPLayerBase.layer_config(self,user=user)
         # if this is a local layer, get the attribute configuration that
         # determines display order & attribute labels
-        if self.local:
-            if Layer.objects.filter(typename=self.name).exists():
-                layer = Layer.objects.get(typename=self.name)
+        if Layer.objects.filter(typename=self.name).exists():
+            try:
+                if self.local:
+                    layer =  Layer.objects.get(typename=self.name)
+                else:
+                    layer = Layer.objects.get(typename=self.name,service__base_url=self.ows_url)
                 attribute_cfg = layer.attribute_config()
                 if "getFeatureInfo" in attribute_cfg:
                     cfg["getFeatureInfo"] = attribute_cfg["getFeatureInfo"]
-                cfg['disabled'] =  user is not None and not user.has_perm('layers.view_layer', obj=layer)
-                cfg['queryable'] = layer.is_vector()
-                cfg['llbbox'] = layer.bbox_string
-                cfg['abstract'] = layer.abstract
-                cfg["group"] = layer.category.gn_description
-                cfg["url"] = layer.ows_url
-                cfg["title"] = layer.title
-            else:
-                # shows maplayer with pink tiles, 
+                if not user.has_perm('base.view_resourcebase', obj=layer.resourcebase_ptr):
+                    cfg['disabled'] = True
+                    cfg['visibility'] = False
+            except:
+                # shows maplayer with pink tiles,
                 # and signals that there is problem
                 # TODO: clear orphaned MapLayers
                 layer = None
+
+        if self.id:
+            #Create temporary cache of maplayer config, should not last too long in case
+            #local layer permissions or configuration values change (default is 5 minutes)
+            cache.set("layer_config" + str(self.id) + "_" + str(0 if user is None else user.id), cfg)
         return cfg
 
     @property
@@ -525,6 +517,10 @@ class MapLayer(models.Model, GXPLayerBase):
         return '%s?layers=%s' % (self.ows_url, self.name)
 
 
+def pre_delete_map(instance, sender, **kwrargs):
+    ct = ContentType.objects.get_for_model(instance)
+    OverallRating.objects.filter(content_type = ct, object_id = instance.id).delete()
+
 class MapSnapshot(models.Model):
     map = models.ForeignKey(Map, related_name="snapshot_set")
     """
@@ -541,7 +537,7 @@ class MapSnapshot(models.Model):
     The date/time the snapshot was created.
     """
 
-    user = models.ForeignKey(User, blank=True, null=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True)
     """
     The user who created the snapshot.
     """
@@ -554,39 +550,5 @@ class MapSnapshot(models.Model):
             "url": num_encode(self.id)
         }
 
-class SocialExplorerLocation(models.Model):
-    map = models.ForeignKey(Map, related_name="jump_set")
-    url = models.URLField(_("Jump URL"), blank=False, null=False, default='http://www.socialexplorer.com/pub/maps/map3.aspx?g=0&mapi=SE0012&themei=B23A1CEE3D8D405BA2B079DDF5DE9402')
-    title = models.TextField(_("Jump Site"), blank=False, null=False)
-
-    def json(self):
-        logger.debug("JSON url: %s", self.url)
-        return {
-            "url": self.url,
-            "title" :  self.title
-        }
-
-
-
-def pre_save_maplayer(instance, sender, **kwargs):
-    # If this object was saved via fixtures,
-    # do not do post processing.
-    if kwargs.get('raw', False):
-        return
-
-    try:
-        c = Catalog(ogc_server_settings.internal_rest, _user, _password)
-        instance.local = isinstance(c.get_layer(instance.name),GsLayer)
-    except EnvironmentError, e:
-        if e.errno == errno.ECONNREFUSED:
-            msg = 'Could not connect to catalog to verify if layer %s was local' % instance.name
-            logger.warn(msg, e)
-        else:
-            raise e
-
-def pre_delete_map(instance, sender, **kwrargs):
-    ct = ContentType.objects.get_for_model(instance)
-    OverallRating.objects.filter(content_type = ct, object_id = instance.id).delete()
-
-
 signals.pre_delete.connect(pre_delete_map, sender=Map)
+signals.post_save.connect(resourcebase_post_save, sender=Map)

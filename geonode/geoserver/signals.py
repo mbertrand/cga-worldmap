@@ -1,6 +1,7 @@
 import errno
 import logging
 import urllib
+import json
 
 from urlparse import urlparse, urljoin
 from socket import error as socket_error
@@ -24,7 +25,6 @@ from geonode.base.models import Thumbnail
 from geonode.layers.models import Layer
 from geonode.layers.utils import create_thumbnail
 from geonode.people.models import Profile
-from geonode.security.enumerations import AUTHENTICATED_USERS, ANONYMOUS_USERS
 
 from geoserver.catalog import FailedRequestError
 from geoserver.layer import Layer as GsLayer
@@ -96,9 +96,9 @@ def geoserver_pre_save(instance, sender, **kwargs):
 
     gs_layer = gs_catalog.get_layer(instance.name)
 
-    if instance.poc and instance.poc.user:
-        gs_layer.attribution = str(instance.poc.user)
-        profile = Profile.objects.get(user=instance.poc.user)
+    if instance.poc and instance.poc:
+        gs_layer.attribution = str(instance.poc)
+        profile = Profile.objects.get(username=instance.poc.username)
         gs_layer.attribution_link = settings.SITEURL[:-1] + profile.get_absolute_url()
         #gs_layer should only be called if ogc_server_settings.BACKEND_WRITE_ENABLED == True
         if getattr(ogc_server_settings,"BACKEND_WRITE_ENABLED", True):
@@ -136,15 +136,25 @@ def geoserver_post_save(instance, sender, **kwargs):
        The way keywords are implemented requires the layer
        to be saved to the database before accessing them.
     """
+
+    if instance.storeType == "remoteStore":
+        #Save layer attributes
+        set_attributes(instance)
+        return
+
+
     url = ogc_server_settings.internal_rest
 
     try:
-        gs_resource= gs_catalog.get_resource(instance.name)
+        gs_resource= gs_catalog.get_resource(instance.name, store=instance.store, workspace=instance.workspace)
     except socket_error as serr:
         if serr.errno != errno.ECONNREFUSED:
             # Not the error we are looking for, re-raise
             raise serr
         # If the connection is refused, take it easy.
+        return
+
+    if gs_resource is None:
         return
 
     if any(instance.keyword_list()):
@@ -199,10 +209,9 @@ def geoserver_post_save(instance, sender, **kwargs):
     elif instance.storeType == 'coverageStore':
         #FIXME(Ariel): This works for public layers, does it work for restricted too?
         # would those end up with no geotiff links, like, forever?
-        permissions = {}
-        permissions['anonymous'] = instance.get_gen_level(ANONYMOUS_USERS)
-        permissions['authenticated'] = instance.get_gen_level(AUTHENTICATED_USERS)
-        instance.set_gen_level(ANONYMOUS_USERS,'layer_readonly')
+        permissions = instance.get_all_level_info()
+       
+        instance.set_permissions({'users':{'AnonymousUser': ['view_resourcebase']}})
 
         try:
             #Potentially 3 dimensions can be returned by the grid if there is a z
@@ -229,8 +238,7 @@ def geoserver_post_save(instance, sender, **kwargs):
                                 )
                             )
 
-        instance.set_gen_level(ANONYMOUS_USERS,permissions['anonymous'])
-        instance.set_gen_level(AUTHENTICATED_USERS,permissions['authenticated'])
+        instance.set_permissions(permissions)
 
     kml_reflector_link_download = settings.SITEURL + "download/wms_kml?" + urllib.urlencode({
         'layers': instance.typename.encode('utf-8'),
@@ -320,7 +328,17 @@ def geoserver_post_save(instance, sender, **kwargs):
 
     thumbnail_remote_url = ogc_server_settings.PUBLIC_LOCATION + "wms/reflect?" + p
 
+    # This is a workaround for development mode where cookies are not shared and the layer is not public so
+    # not visible through geoserver
+    if settings.DEBUG:
+        from geonode.security.views import _perms_info_json
+        current_perms = _perms_info_json(instance.get_self_resource())
+        instance.set_default_permissions()
+
     create_thumbnail(instance, thumbnail_remote_url)
+
+    if settings.DEBUG:
+        instance.set_permissions(json.loads(current_perms))
 
     legend_url = ogc_server_settings.PUBLIC_LOCATION +'wms?request=GetLegendGraphic&format=image/png&WIDTH=20&HEIGHT=20&LAYER='+instance.typename+'&legend_options=fontAntiAliasing:true;fontSize:12;forceLabels:on'
 

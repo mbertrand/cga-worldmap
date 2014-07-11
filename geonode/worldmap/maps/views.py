@@ -11,18 +11,16 @@ import logging
 import re
 from geonode.documents.models import get_related_documents
 import httplib2
-from geonode.security.enumerations import AUTHENTICATED_USERS, ANONYMOUS_USERS
 from geonode.maps.models import Map, MapLayer
-from geonode.maps.views import _resolve_map, map_json as basemap_json, new_map_config, map_detail
-from geonode.maps.views import MAP_LEV_NAMES, _PERMISSION_MSG_GENERIC, _PERMISSION_MSG_LOGIN, _PERMISSION_MSG_VIEW
+from geonode.maps.views import _resolve_map, new_map_config, map_detail
+from geonode.maps.views import  _PERMISSION_MSG_GENERIC, _PERMISSION_MSG_VIEW
 from geonode.security.views import _perms_info
-from geonode.utils import resolve_object, ogc_server_settings
+from geonode.utils import resolve_object
+from geonode.geoserver.helpers import ogc_server_settings
 from geonode.layers.models import Layer
-from geonode.worldmap.profile.forms import ContactProfileForm
 from geonode.maps.models import MapSnapshot
 from geonode.encode import num_encode, num_decode
 from geonode.worldmap.stats.models import MapStats
-from geonode.worldmap.security.views import _perms_info_email_json
 from geonode.utils import layer_from_viewer_config
 from django.views.decorators.csrf import csrf_exempt
 
@@ -51,14 +49,6 @@ def addLayerJSON(request):
         return HttpResponse(status=500)
 
 
-def _resolve_map_custom(request, id, fieldname, permission='maps.change_map',
-                 msg=_PERMISSION_MSG_GENERIC, **kwargs):
-    '''
-    Resolve the Map by the provided typename and check the optional permission.
-    '''
-    return resolve_object(request, Map, {fieldname:id}, permission = permission,
-                          permission_msg=msg, **kwargs)
-
 
 def map_view(request, mapid, snapshot=None, template='maps/map_view.html'):
     """
@@ -66,10 +56,7 @@ def map_view(request, mapid, snapshot=None, template='maps/map_view.html'):
     the map with the given map ID.
     """
 
-    if not mapid.isdigit():
-        map_obj = _resolve_map_custom(request, mapid, 'urlsuffix', 'maps.view_map', _PERMISSION_MSG_VIEW)
-    else:
-        map_obj = _resolve_map(request, mapid, 'maps.view_map', _PERMISSION_MSG_VIEW)
+    map_obj = _resolve_map(request, mapid, 'maps.view_map', _PERMISSION_MSG_VIEW)
     
     if snapshot is None:
         config = map_obj.viewer_json(request.user)
@@ -87,11 +74,7 @@ def map_view(request, mapid, snapshot=None, template='maps/map_view.html'):
     }))
 
 def map_detail(request, mapid, template='maps/map_detail.html'):
-    if not mapid.isdigit():
-        map_obj = _resolve_map_custom(request, mapid, 'urlsuffix', 'maps.view_map', _PERMISSION_MSG_VIEW)
-    else:
-        map_obj = _resolve_map(request, mapid, 'maps.view_map', _PERMISSION_MSG_VIEW)
-
+    map_obj = _resolve_map(request, mapid, 'maps.view_map', _PERMISSION_MSG_VIEW)
     map_obj.popular_count += 1
     map_obj.save()
 
@@ -102,7 +85,7 @@ def map_detail(request, mapid, template='maps/map_detail.html'):
         'config': config,
         'map': map_obj,
         'layers': layers,
-        'permissions_json': json.dumps(_perms_info(map_obj, MAP_LEV_NAMES)),
+        'permissions_json': json.dumps(_perms_info(map_obj)),
         "documents": get_related_documents(map_obj),
         'urlsuffix': get_suffix_if_custom(map_obj)
         }))
@@ -354,7 +337,7 @@ def official_site(request, site):
     The view that returns the map composer opened to
     the map with the given official site url.
     """
-    map_obj = _resolve_map_custom(request, site, 'officialurl', 'maps.view_map', _PERMISSION_MSG_VIEW)
+    map_obj = _resolve_map(request, site, 'maps.view_map', _PERMISSION_MSG_VIEW)
     return map_view(request, str(map_obj.id))
 
 def official_site_mobile(request, site):
@@ -362,7 +345,7 @@ def official_site_mobile(request, site):
     The view that returns the map composer opened to
     the map with the given official site url.
     """
-    map_obj = _resolve_map_custom(request, site, 'officialurl', 'maps.view_map', _PERMISSION_MSG_VIEW)
+    map_obj = _resolve_map(request, site,'maps.view_map', _PERMISSION_MSG_VIEW)
     return mobilemap(request, str(map_obj.id))
 
 
@@ -371,7 +354,7 @@ def official_site_info(request, site):
     main view for map resources, dispatches to correct
     view based on method and query args.
     '''
-    map_obj = _resolve_map_custom(request, site, 'officialurl', 'maps.view_map', _PERMISSION_MSG_VIEW)
+    map_obj = _resolve_map(request, site,'maps.view_map', _PERMISSION_MSG_VIEW)
     return map_detail(request, str(map_obj.id))
 
 def tweetview(request):

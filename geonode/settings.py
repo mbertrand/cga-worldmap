@@ -20,7 +20,6 @@
 
 # Django settings for the GeoNode project.
 import os
-import logging
 
 #
 # General Django development settings
@@ -29,8 +28,6 @@ import logging
 # Defines the directory that contains the settings file as the PROJECT_ROOT
 # It is used for relative settings elsewhere.
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-
-
 
 # Setting debug to true makes Django serve static media and
 # present pretty error pages.
@@ -49,15 +46,13 @@ DEBUG = TEMPLATE_DEBUG = True
 
 
 # Set to True to load non-minified versions of (static) client dependencies
-# Requires to set-up Node and tools that are required for static development 
+# Requires to set-up Node and tools that are required for static development
 # otherwise it will raise errors for the missing non-minified dependencies
 DEBUG_STATIC = False
-
 
 # This is needed for integration tests, they require
 # geonode to be listening for GeoServer auth requests.
 os.environ['DJANGO_LIVE_TEST_SERVER_ADDRESS'] = 'localhost:8000'
-
 
 # Defines settings for development
 DATABASES = {
@@ -88,9 +83,6 @@ TIME_ZONE = 'America/New_York'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
-
-gettext = lambda s: s
-
 LANGUAGE_CODE = 'en'
 
 LANGUAGES = (
@@ -108,21 +100,27 @@ LANGUAGES = (
     ('ru', 'Russian'),
     ('vi', 'Vietnamese'),
     #('fil', 'Filipino'),
-    
+
 )
+
+AUTH_USER_MODEL = 'people.Profile'
 
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
 USE_I18N = True
 
+MODELTRANSLATION_DEFAULT_LANGUAGE = 'en'
+
+MODELTRANSLATION_LANGUAGES = ('en', 'es', )
+
 # Absolute path to the directory that holds media.
 # Example: "/home/media/media.lawrence.com/"
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, "site_media", "media")
+MEDIA_ROOT = os.path.join(PROJECT_ROOT, "uploaded")
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash if there is a path component (optional in other cases).
 # Examples: "http://media.lawrence.com", "http://example.com/media/"
-MEDIA_URL = "/site_media/media/"
+MEDIA_URL = "/uploaded/"
 
 # Absolute path to the directory that holds static files like app media.
 # Example: "/home/media/media.lawrence.com/apps/"
@@ -131,10 +129,6 @@ STATIC_ROOT = os.path.join(PROJECT_ROOT, "static_root")
 # URL that handles the static files like app media.
 # Example: "http://media.lawrence.com"
 STATIC_URL = "/static/"
-
-GEONODE_UPLOAD_PATH = os.path.join(MEDIA_ROOT, "geonode")
-GEONODE_CLIENT_LOCATION = STATIC_URL + "geonode/"
-ADMIN_MEDIA_PREFIX = os.path.join(STATIC_URL, "admin/")
 
 # Additional directories which hold static files
 STATICFILES_DIRS = [
@@ -177,13 +171,15 @@ LOGOUT_URL = '/account/logout/'
 
 # Documents application
 ALLOWED_DOCUMENT_TYPES = [
-    'doc', 'docx','gif', 'jpg', 'jpeg', 'ods', 'odt', 'pdf', 'png', 'ppt', 
-    'rar', 'tif', 'tiff', 'txt', 'xls', 'xlsx', 'xml', 'zip', 
+    'doc', 'docx','gif', 'jpg', 'jpeg', 'ods', 'odt', 'pdf', 'png', 'ppt',
+    'rar', 'tif', 'tiff', 'txt', 'xls', 'xlsx', 'xml', 'zip',
 ]
 MAX_DOCUMENT_SIZE = 2 # MB
 
 
 GEONODE_APPS = (
+
+
     # GeoNode internal apps
     'geonode.people',
     'geonode.base',
@@ -195,13 +191,12 @@ GEONODE_APPS = (
     'geonode.catalogue',
     'geonode.documents',
     'geonode.api',
-    'geonode.search',
+    'geonode.groups',
+    'geonode.services',
 
     # GeoNode Contrib Apps
-    'geonode.contrib.services',
-    'geonode.contrib.groups',
-    'geonode.contrib.services',
-    'geonode.contrib.dynamic',
+
+    #'geonode.contrib.dynamic',
 
     # GeoServer Apps
     # Geoserver needs to come last because
@@ -229,6 +224,10 @@ WORLDMAP_APPS = (
 
 INSTALLED_APPS = (
 
+    # Boostrap admin theme
+    # 'django_admin_bootstrapped.bootstrap3',
+    # 'django_admin_bootstrapped',
+
     # Apps bundled with Django
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -251,10 +250,10 @@ INSTALLED_APPS = (
     'geoexplorer',
     'leaflet',
     'django_extensions',
-    'modeltranslation',
+    #'haystack',
     'autocomplete_light',
-    'tastypie',
-    'polymorphic',
+    'mptt',
+    'modeltranslation',
 
     # Theme
     "pinax_theme_bootstrap_account",
@@ -270,6 +269,9 @@ INSTALLED_APPS = (
     'announcements',
     'actstream',
     'user_messages',
+    'tastypie',
+    'polymorphic',
+    'guardian',
 
     # Queue
     'djcelery',
@@ -366,25 +368,15 @@ MIDDLEWARE_CLASSES = (
     'pagination.middleware.PaginationMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    # This middleware allows to print private layers for the users that have
-    # the permissions to view them.
-    # It sets temporary the involved layers as public before restoring the permissions.
-    # Beware that for few seconds the involved layers are public there could be risks.
-    #'geonode.geoserver.middleware.PrintProxyMiddleware',
 )
 
 
 # Replacement of default authentication backend in order to support
 # permissions per object.
-AUTHENTICATION_BACKENDS = ('geonode.security.auth.GranularBackend',)
+AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend','guardian.backends.ObjectPermissionBackend',)
 
-def get_user_url(u):
-    return u.profile.get_absolute_url()
-
-
-ABSOLUTE_URL_OVERRIDES = {
-    'auth.user': get_user_url
-}
+ANONYMOUS_USER_ID = -1
+GUARDIAN_GET_INIT_ANONYMOUS_USER = 'geonode.people.models.get_anonymous_user_instance'
 
 #
 # Settings for default search size
@@ -411,7 +403,7 @@ AGON_RATINGS_CATEGORY_CHOICES = {
 
 # Activity Stream
 ACTSTREAM_SETTINGS = {
-    'MODELS': ('auth.user', 'layers.layer', 'maps.map', 'dialogos.comment', 'documents.document', 'services.service'),
+    'MODELS': ('people.Profile', 'layers.layer', 'maps.map', 'dialogos.comment', 'documents.document', 'services.service'),
     'FETCH_RELATIONS': True,
     'USE_PREFETCH': False,
     'USE_JSONFIELD': True,
@@ -452,10 +444,7 @@ CASCADE_WORKSPACE = 'geonode'
 
 OGP_URL = "http://geodata.tufts.edu/solr/select"
 
-# Default TopicCategory to be used for resources. Use the slug field here
-DEFAULT_TOPICCATEGORY = 'location'
-
-# Topic Categories list should not be modified (they are ISO). In case you 
+# Topic Categories list should not be modified (they are ISO). In case you
 # absolutely need it set to True this variable
 MODIFY_TOPICCATEGORY = False
 
@@ -477,7 +466,7 @@ OGC_SERVER = {
         'USER' : 'admin',
         'PASSWORD' : 'geoserver',
         'MAPFISH_PRINT_ENABLED' : True,
-        'PRINTNG_ENABLED' : True,
+        'PRINT_NG_ENABLED' : True,
         'GEONODE_SECURITY_ENABLED' : True,
         'GEOGIT_ENABLED' : False,
         'WMST_ENABLED' : False,
@@ -567,14 +556,12 @@ PYCSW = {
 
 # GeoNode javascript client configuration
 
-
 # Where should newly created maps be focused?
 DEFAULT_MAP_CENTER = (0, 0)
 
 # How tightly zoomed should newly created maps be?
 # 0 = entire world;
 # maximum zoom is between 12 and 15 (for Google Maps, coverage varies by area)
-
 DEFAULT_MAP_ZOOM = 0
 
 MAP_BASELAYERS = [{
@@ -661,12 +648,18 @@ MAP_BASELAYERS = [{
         "group": "background"
     }]
 
+if 'geonode.geoserver' in INSTALLED_APPS:
+    LOCAL_GEOSERVER = {
+        "source": {
+            "ptype": "gxp_wmscsource",
+            "url": OGC_SERVER['default']['PUBLIC_LOCATION'] + "wms",
+            "restUrl": "/gs/rest"
+        }
+    }
+    baselayers = MAP_BASELAYERS
+    MAP_BASELAYERS = [LOCAL_GEOSERVER]
+    MAP_BASELAYERS.extend(baselayers)
 
-# GeoNode vector data backend configuration.
-
-# Uploader backend (rest or importer)
-
-UPLOADER_BACKEND_URL = 'rest'
 
 
 SOCIAL_BUTTONS = True
@@ -766,12 +759,32 @@ PROXY_ALLOWED_HOSTS = ()
 # The proxy to use when making cross origin requests.
 PROXY_URL = '/proxy/?url=' if DEBUG else None
 
+# Haystack Search Backend Configuration.  To enable, first install the following:
+# - pip install django-haystack
+# - pip install pyelasticsearch
+# Set HAYSTACK_SEARCH to True
+# Run "python manage.py rebuild_index"
+HAYSTACK_SEARCH = False
+#Avoid permissions prefiltering
+SKIP_PERMS_FILTER = False
+#Update facet counts from Haystack
+HAYSTACK_FACET_COUNTS = False
+#HAYSTACK_CONNECTIONS = {
+#    'default': {
+#        'ENGINE': 'haystack.backends.elasticsearch_backend.ElasticsearchSearchEngine',
+#        'URL': 'http://127.0.0.1:9200/',
+#        'INDEX_NAME': 'geonode',
+#        },
+#    }
+#HAYSTACK_SIGNAL_PROCESSOR = 'haystack.signals.RealtimeSignalProcessor'
+#HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
+
 # Available download formats
 DOWNLOAD_FORMATS_METADATA = [
     'Atom', 'DIF', 'Dublin Core', 'ebRIM', 'FGDC', 'TC211',
 ]
 DOWNLOAD_FORMATS_VECTOR = [
-    'JPEG', 'PDF', 'PNG', 'Zipped Shapefile', 'GML 2.0', 'GML 3.1.1', 'CSV', 
+    'JPEG', 'PDF', 'PNG', 'Zipped Shapefile', 'GML 2.0', 'GML 3.1.1', 'CSV',
     'Excel', 'GeoJSON', 'KML', 'View in Google Earth', 'Tiles',
 ]
 DOWNLOAD_FORMATS_RASTER = [
@@ -787,7 +800,7 @@ TASTYPIE_DEFAULT_FORMATS = ['json']
 AUTO_GENERATE_AVATAR_SIZES = (20,32,80,100,140,200)
 
 # Number of results per page listed in the GeoNode search pages
-CLIENT_RESULTS_LIMIT = 10
+CLIENT_RESULTS_LIMIT = 100
 
 # Number of items returned by the apis 0 equals no limit
 API_LIMIT_PER_PAGE = 0
@@ -798,8 +811,32 @@ LEAFLET_CONFIG = {
     # http://leaflet-extras.github.io/leaflet-providers/preview/
 
     # Stamen toner lite.
+    ('Watercolor', 'http://{s}.tile.stamen.com/watercolor/{z}/{x}/{y}.png', 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'),
     ('Toner Lite', 'http://{s}.tile.stamen.com/toner-lite/{z}/{x}/{y}.png', 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'),
-]
+],
+'PLUGINS': {
+    'esri-leaflet': {
+        'js': 'lib/js/esri-leaflet.js',
+        'auto-include': True,
+        },
+    }
+}
+
+CACHES = {
+    #DUMMY CACHE FOR DEVELOPMENT
+    'default': {
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        },
+    #MEMCACHED EXAMPLE
+    # 'default': {
+    #     'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+    #     'LOCATION': '127.0.0.1:11211',
+    #     },
+    #FILECACHE EXAMPLE
+    # 'default': {
+    #     'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+    #     'LOCATION': '/tmp/django_cache',
+    #     }
 }
 
 # Load more settings from a file called local_settings.py if it exists

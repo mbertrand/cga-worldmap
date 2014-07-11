@@ -103,12 +103,12 @@ class WorldMapLayerForm(forms.ModelForm):
 
     poc = forms.ModelChoiceField(empty_label = _("Person outside WorldMap (fill form)"),
                                     label = "*" + _("Point Of Contact"), required=False,
-                                    queryset = Profile.objects.exclude(user=None),
+                                    queryset = Profile.objects.exclude(username='AnonymousUser'),
                                     widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
 
     metadata_author = forms.ModelChoiceField(empty_label = _("Person outside WorldMap (fill form)"),
                                     label = _("Metadata Author"), required=False,
-                                    queryset = Profile.objects.exclude(user=None),
+                                    queryset = Profile.objects.exclude(username='AnonymousUser'),
                                     widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
 
 

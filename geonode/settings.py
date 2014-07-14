@@ -250,7 +250,7 @@ INSTALLED_APPS = (
     'geoexplorer',
     'leaflet',
     'django_extensions',
-    #'haystack',
+    'haystack',
     'autocomplete_light',
     'mptt',
     'modeltranslation',
@@ -473,7 +473,7 @@ OGC_SERVER = {
         'BACKEND_WRITE_ENABLED': True,
         'WPS_ENABLED' : True,
         # Set to name of database in DATABASES dictionary to enable
-        'DATASTORE':  'wmdata',
+        'DATASTORE':  '',#'wmdata',
         'DOWNLOAD_URL' : 'http://localhost:8080/geoserver/',
         'TIMEOUT': 10  # number of seconds to allow for HTTP requests
     }
@@ -764,20 +764,20 @@ PROXY_URL = '/proxy/?url=' if DEBUG else None
 # - pip install pyelasticsearch
 # Set HAYSTACK_SEARCH to True
 # Run "python manage.py rebuild_index"
-HAYSTACK_SEARCH = False
+HAYSTACK_SEARCH = True
 #Avoid permissions prefiltering
-SKIP_PERMS_FILTER = False
+SKIP_PERMS_FILTER = True
 #Update facet counts from Haystack
-HAYSTACK_FACET_COUNTS = False
-#HAYSTACK_CONNECTIONS = {
-#    'default': {
-#        'ENGINE': 'haystack.backends.elasticsearch_backend.ElasticsearchSearchEngine',
-#        'URL': 'http://127.0.0.1:9200/',
-#        'INDEX_NAME': 'geonode',
-#        },
-#    }
-#HAYSTACK_SIGNAL_PROCESSOR = 'haystack.signals.RealtimeSignalProcessor'
-#HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
+HAYSTACK_FACET_COUNTS = True
+HAYSTACK_CONNECTIONS = {
+   'default': {
+       'ENGINE': 'haystack.backends.elasticsearch_backend.ElasticsearchSearchEngine',
+       'URL': 'http://127.0.0.1:9200/',
+       'INDEX_NAME': 'worldmap',
+       },
+   }
+HAYSTACK_SIGNAL_PROCESSOR = 'haystack.signals.RealtimeSignalProcessor'
+HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
 
 # Available download formats
 DOWNLOAD_FORMATS_METADATA = [

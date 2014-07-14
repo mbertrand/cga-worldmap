@@ -9,6 +9,7 @@ from django.utils.translation import ugettext as _
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
 from django.utils.html import escape
+from geonode.base.forms import CategoryForm
 from geonode.people.forms import ProfileForm
 from geonode.geoserver.helpers import ogc_server_settings
 from geonode.base.enumerations import CHARSETS
@@ -297,7 +298,7 @@ def category_list():
 
 @login_required
 def layer_metadata(request, layername, template='layers/layer_metadata.html'):
-    layer = _resolve_layer(request, layername, 'layers.change_layer', _PERMISSION_MSG_METADATA)
+    layer = _resolve_layer(request, layername, 'base.change_resourcebase', _PERMISSION_MSG_METADATA)
     layer_attribute_set = inlineformset_factory(Layer, Attribute, extra=0, form=GazetteerAttributeForm, )
 
     topic_category = layer.category
@@ -323,7 +324,7 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
     if request.method == "POST":
         layer_form = WorldMapLayerForm(request.POST, instance=layer, prefix="resource")
         attribute_form = layer_attribute_set(request.POST, instance=layer, prefix="layer_attribute_set", queryset=Attribute.objects.order_by('display_order'))
-        category_form = LayerCategoryForm(request.POST,prefix="category_choice_field",
+        category_form = CategoryForm(request.POST,prefix="category_choice_field",
             initial=int(request.POST["category_choice_field"]) if "category_choice_field" in request.POST else None)
         if show_gazetteer_form:
             gazetteer_form = GazetteerForm(request.POST)
@@ -331,7 +332,7 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
     else:
         layer_form = WorldMapLayerForm(instance=layer, prefix="resource")
         attribute_form = layer_attribute_set(instance=layer, prefix="layer_attribute_set", queryset=Attribute.objects.order_by('display_order'))
-        category_form = LayerCategoryForm(prefix="category_choice_field", initial=topic_category.id if topic_category else None)
+        category_form = CategoryForm(prefix="category_choice_field", initial=topic_category.id if topic_category else None)
         if show_gazetteer_form:
             gazetteer_form = GazetteerForm()
             gazetteer_form.fields['project'].initial = layer.gazetteer_project
@@ -351,13 +352,12 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
         tab = request.GET["tab"]
 
     if request.method == "POST" and layer_form.is_valid() and attribute_form.is_valid() and category_form.is_valid():
-
         new_poc = layer_form.cleaned_data['poc']
         new_author = layer_form.cleaned_data['metadata_author']
         new_keywords = layer_form.cleaned_data['keywords']
 
         if new_poc is None:
-            if poc.user is None:
+            if poc is None:
                 poc_form = ProfileForm(request.POST, prefix="poc", instance=poc)
             else:
                 poc_form = ProfileForm(request.POST, prefix="poc")
@@ -365,9 +365,9 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
                 new_poc = poc_form.save()
 
         if new_author is None:
-            if metadata_author.user is None:
+            if metadata_author is None:
                 author_form = ProfileForm(request.POST, prefix="author",
-                                          instance=metadata_author)
+                    instance=metadata_author)
             else:
                 author_form = ProfileForm(request.POST, prefix="author")
             if author_form.has_changed and author_form.is_valid():
@@ -399,7 +399,6 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
                         if len(gazetteer_form.cleaned_data["endDateFormat"]) > 0 else None
 
             la.save()
-            cache.delete('layer_searchfields_' + layer.typename)
 
         if new_poc is not None and new_author is not None:
             the_layer = layer_form.save(commit=False)
@@ -447,14 +446,14 @@ def layer_metadata(request, layername, template='layers/layer_metadata.html'):
                     return HttpResponseRedirect(reverse('layer_detail', args=(layer.typename,)))
 
 
-    if poc.user is None:
+    if poc is None:
         poc_form = ProfileForm(instance=poc, prefix="poc")
     else:
         layer_form.fields['poc'].initial = poc.id
         poc_form = ProfileForm(prefix="poc")
         poc_form.hidden=True
 
-    if metadata_author.user is None:
+    if metadata_author is None:
         author_form = ProfileForm(instance=metadata_author, prefix="author")
     else:
         layer_form.fields['metadata_author'].initial = metadata_author.id

@@ -5,7 +5,7 @@ from geonode.worldmap.register.views import SignupView, registercompleteOrganiza
 
 urlpatterns = patterns('',
                        url(r"^signup/$", SignupView.as_view(), name="account_signup"),
-                       url(r'^forgotname',forgot_username,name='forgot_username'),
+                       #url(r'^forgotname',forgot_username,name='forgot_username'),
                        url(r'^registercomplete/$',
                            registercompleteOrganizationUser,
                            name='registration_complete'),

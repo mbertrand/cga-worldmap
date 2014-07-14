@@ -101,26 +101,26 @@ class WorldMapLayerForm(forms.ModelForm):
     abstract = forms.CharField(label = '*' + _('Abstract'), widget=forms.Textarea(attrs={'cols': 120}))
     keywords = taggit.forms.TagField(required=False, help_text=_("A space or comma-separated list of keywords"))
 
-    poc = forms.ModelChoiceField(empty_label = _("Person outside WorldMap (fill form)"),
-                                    label = "*" + _("Point Of Contact"), required=False,
-                                    queryset = Profile.objects.exclude(username='AnonymousUser'),
-                                    widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
+    poc = forms.ModelChoiceField(empty_label = "Person outside WorldMap (fill form)",
+                                 label = "Point Of Contact", required=False,
+                                 queryset = Profile.objects.exclude(username='AnonymousUser'),
+                                 widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
 
-    metadata_author = forms.ModelChoiceField(empty_label = _("Person outside WorldMap (fill form)"),
-                                    label = _("Metadata Author"), required=False,
-                                    queryset = Profile.objects.exclude(username='AnonymousUser'),
-                                    widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
+    metadata_author = forms.ModelChoiceField(empty_label = "Person outside WorldMap (fill form)",
+                                             label = "Metadata Author", required=False,
+                                             queryset = Profile.objects.exclude(username='AnonymousUser'),
+                                             widget=autocomplete_light.ChoiceWidget('ProfileAutocomplete'))
 
 
 
     class Meta:
         model = Layer
         exclude = ('contacts','workspace', 'store', 'name', 'uuid', 'storeType', 'typename',
-                   'bbox_x0', 'bbox_x1', 'bbox_y0', 'bbox_y1', 'srs', 'category',
+                   'bbox_x0', 'bbox_x1', 'bbox_y0', 'bbox_y1', 'srid', 'category',
                    'csw_typename', 'csw_schema', 'csw_mdsource', 'csw_type',
                    'csw_wkt_geometry', 'metadata_uploaded', 'metadata_xml', 'csw_anytext',
-                   'popular_count', 'share_count', 'thumbnail', 'default_style', 'styles',
-                    'gazetteer_project', 'in_gazetteer')
+                   'popular_count', 'share_count', 'thumbnail', 'default_style', 'styles')
+        widgets = autocomplete_light.get_widgets_dict(Layer)
         
         
 class GazetteerAttributeForm(forms.ModelForm):

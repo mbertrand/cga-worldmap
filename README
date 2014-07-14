@@ -211,7 +211,7 @@ You can eventually generate a pdf containing the whole documentation set. For th
   vendor, or packaged other than on PyPI.  When in doubt, however, just leave
   this option out.
 
-Development Roadmap
+Devecelerylopment Roadmap
 ===================
 
 Geonode's development roadmap is documented in a series of Geonode Improvement Projects (GNIPS). 

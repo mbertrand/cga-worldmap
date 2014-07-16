@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger("geonode.hoods.models")
 
 def post_save_map(instance, sender, **kwargs):
-    if instance.officialurl == 'boston' and settings.HOODS_TEMPLATE_ID is not None:
+    if instance.featuredurl == 'boston' and settings.HOODS_TEMPLATE_ID is not None:
         logger.info("Update hood map")
         update_hood_map()
     else:

@@ -72,8 +72,8 @@
             {% block logos %}
                 {% block breadcrumb %}
                     {% if urlsuffix %}
-                        {% if map.officialurl %}
-                            <div id="page-breadcrumb"><a href="{% url "geonode.maps.views.official_site" map.officialurl %}">{{title}}</a></div>
+                        {% if map.featuredurl %}
+                            <div id="page-breadcrumb"><a href="{% url "geonode.maps.views.official_site" map.featuredurl %}">{{title}}</a></div>
                         {% else %}
                             <div id="page-breadcrumb"><span>{{title}}</span></div>
                         {% endif %}

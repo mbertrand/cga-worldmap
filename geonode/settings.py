@@ -128,7 +128,7 @@ STATIC_ROOT = os.path.join(PROJECT_ROOT, "static_root")
 
 # URL that handles the static files like app media.
 # Example: "http://media.lawrence.com"
-STATIC_URL = "/static/"
+STATIC_URL = "/wtf/"
 
 # Additional directories which hold static files
 STATICFILES_DIRS = [

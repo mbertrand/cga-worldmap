@@ -215,8 +215,8 @@ def snapshot_config(snapshot, map_obj, user):
 
 def get_suffix_if_custom(map):
     if map.use_custom_template:
-        if map.officialurl:
-            return map.officialurl
+        if map.featuredurl:
+            return map.featuredurl
         elif map.urlsuffix:
             return map.urlsuffix
         else:
@@ -323,8 +323,8 @@ def printmap(request, mapid=None, snapshot=None):
 
 def get_suffix_if_custom(map):
     if map.use_custom_template:
-        if map.officialurl:
-            return map.officialurl
+        if map.featuredurl:
+            return map.featuredurl
         elif map.urlsuffix:
             return map.urlsuffix
         else:

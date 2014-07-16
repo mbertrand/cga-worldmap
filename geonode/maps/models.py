@@ -316,11 +316,12 @@ class Map(ResourceBase, GXPMapBase):
             return results
 
         config = GXPMapBase.viewer_json(self, user, *added_layers)
-        sejumps = self.jump_set.all()
         config['about']['urlsuffix'] = self.urlsuffix
         config['about']['introtext'] = self.content
-        config['about']['officialurl'] = self.officialurl
-        config['social_explorer'] =[se.json() for se in sejumps]
+        config['about']['featuredurl'] = self.featuredurl
+        #TODO: Fix this for BostonMap
+        #sejumps = self.jump_set.all()
+        #config['social_explorer'] =[se.json() for se in sejumps]
 
         if self.group_params:
             #config["treeconfig"] = json.loads(self.group_params)

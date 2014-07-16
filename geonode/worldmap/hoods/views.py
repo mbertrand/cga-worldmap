@@ -102,7 +102,7 @@ def update_hood_map():
     Update the neighborhood template map to be the same as the Boston Research Map
     """
     hood_map = Map.objects.get(id=settings.HOODS_TEMPLATE_ID)
-    boston_map = Map.objects.get(officialurl='boston')
+    boston_map = Map.objects.get(featuredurl='boston')
     cache.delete('maplayerset_' + str(hood_map.id))
     
     if hood_map is not None:

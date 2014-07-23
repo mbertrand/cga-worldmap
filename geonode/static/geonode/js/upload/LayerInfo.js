@@ -273,7 +273,7 @@ define(function (require, exports) {
             tab_id = "worldmap_create_panel";
         }
     	if (tab.length > 0) {
-    		redirect += "tab/?tab=" + tab_id;
+    		redirect += "/tab/?tab=" + tab_id;
             tab.load(redirect);
     	} else
     		document.location.href = redirect;

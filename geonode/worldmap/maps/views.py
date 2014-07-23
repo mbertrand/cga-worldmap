@@ -11,11 +11,12 @@ import logging
 import re
 from geonode.documents.models import get_related_documents
 import httplib2
+from geonode.layers.views import _resolve_layer
 from geonode.maps.models import Map, MapLayer
 from geonode.maps.views import _resolve_map, new_map_config, map_detail
 from geonode.maps.views import  _PERMISSION_MSG_GENERIC, _PERMISSION_MSG_VIEW
 from geonode.security.views import _perms_info
-from geonode.utils import resolve_object
+from geonode.utils import resolve_object, llbbox_to_mercator
 from geonode.geoserver.helpers import ogc_server_settings
 from geonode.layers.models import Layer
 from geonode.maps.models import MapSnapshot
@@ -34,10 +35,43 @@ def addLayerJSON(request):
 
     if layername:
         try:
-            layer = Layer.objects.get(typename=layername)
+            layer = _resolve_layer(request,layername,'base.view_resourcebase', _PERMISSION_MSG_VIEW)
             if not request.user.has_perm("layers.view_layer", obj=layer):
                 return HttpResponse(status=401)
-            maplayer = MapLayer(name=layer.typename, local=True)
+
+
+
+            config = layer.attribute_config()
+            bbox = list(layer.bbox[0:4])
+            #Add required parameters for GXP lazy-loading
+            config["srs"] = layer.srid
+            config["title"] = layer.title
+            config["group"] = unicode(layer.category)
+            config["bbox"] =  [float(coord) for coord in bbox] \
+                if layer.srid == "EPSG:4326" else llbbox_to_mercator([float(coord) for coord in bbox])
+            config["queryable"] = True
+
+
+
+            if layer.storeType == "remoteStore":
+                service = layer.service
+                maplayer = MapLayer(name = layer.typename,
+                                    ows_url = layer.ows_url,
+                                    layer_params= config,
+                                    visibility=True,
+                                    source_params={
+                                        "ptype":service.ptype,
+                                        "remote": True,
+                                        "url": service.base_url,
+                                        "name": service.name})
+            else:
+                maplayer = MapLayer(
+                    name = layer.typename,
+                    ows_url = layer.ows_url,
+                    layer_params=config,
+                    visibility = True
+                )
+
             sfJSON = {'layer': maplayer.layer_config(request.user)}
             logger.debug('sfJSON is [%s]', str(sfJSON))
             return HttpResponse(json.dumps(sfJSON))

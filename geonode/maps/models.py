@@ -477,11 +477,16 @@ class MapLayer(models.Model, GXPLayerBase):
                 else:
                     layer = Layer.objects.get(typename=self.name,service__base_url=self.ows_url)
                 attribute_cfg = layer.attribute_config()
+                cfg["title"] = layer.title
+                cfg["group"] = unicode(layer.category)
+                cfg["url"] = self.ows_url
                 if "getFeatureInfo" in attribute_cfg:
                     cfg["getFeatureInfo"] = attribute_cfg["getFeatureInfo"]
                 if not user.has_perm('base.view_resourcebase', obj=layer.resourcebase_ptr):
                     cfg['disabled'] = True
                     cfg['visibility'] = False
+                if self.source_params:
+                    cfg['source_params'] = json.loads(self.source_params)
             except:
                 # shows maplayer with pink tiles,
                 # and signals that there is problem

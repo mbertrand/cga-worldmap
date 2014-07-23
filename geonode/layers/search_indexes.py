@@ -14,6 +14,7 @@ class LayerIndex(indexes.SearchIndex, indexes.Indexable):
     type = indexes.CharField(faceted=True)
     subtype = indexes.CharField(faceted=True)
     name = indexes.CharField(model_attr="name")
+    service_typename = indexes.CharField(model_attr="service_typename")
     title = indexes.CharField(model_attr="title", boost=2)
     title_sortable = indexes.CharField(indexed=False) #Necessary for sorting
     description = indexes.CharField(model_attr="abstract",boost=1.5)

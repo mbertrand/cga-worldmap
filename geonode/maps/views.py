@@ -466,6 +466,7 @@ def new_map_config(request):
                 #Add required parameters for GXP lazy-loading
                 config["srs"] = layer.srid
                 config["title"] = layer.title
+                config["group"] = layer.category.gn_description if layer.category else ''
                 config["bbox"] =  [float(coord) for coord in bbox] \
                     if layer.srid == "EPSG:4326" else llbbox_to_mercator([float(coord) for coord in bbox])
                 config["queryable"] = True
@@ -477,6 +478,7 @@ def new_map_config(request):
                                         ows_url = layer.ows_url,
                                         layer_params=json.dumps( config),
                                         visibility=True,
+
                                         source_params=json.dumps({
                                             "ptype":service.ptype,
                                             "remote": True,

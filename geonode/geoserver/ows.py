@@ -31,60 +31,51 @@ logger = logging.getLogger(__name__)
 DEFAULT_EXCLUDE_FORMATS = ['PNG', 'JPEG', 'GIF', 'TIFF']
 
 
+def _wcs_link(wcs_url, identifier, mime, crs=None, bbox=None):
+    """
+    Generate a WCS 2.0.0 download link
+    """
+    params = {
+        'service': 'WCS',
+        'version': '2.0.0',
+        'request': 'GetCoverage',
+        'coverageId': identifier,
+        'format': mime,
+    }
+    if crs:
+        params["crs"] = crs
+    if bbox:
+        params["bbox"] = bbox
+    return wcs_url + urllib.urlencode(params)
+
 def wcs_links(
         wcs_url,
         identifier,
         bbox=None,
         crs=None,
-        height=None,
-        width=None,
-        exclude_formats=True,
-        quiet=True,
-        version='1.0.0'):
-    # FIXME(Ariel): This would only work for layers marked for public view,
-    # what about the ones with permissions enabled?
+        exclude_formats=True):
+    """
+    Generate a set of WCS 2.0.0 links
+    """
 
-    try:
-        wcs = WebCoverageService(wcs_url, version=version)
-    except ServiceException as err:
-        err_msg = 'WCS server returned exception: %s' % err
-        if not quiet:
-            logger.warn(err_msg)
-        raise GeoNodeException(err_msg)
+    bbox = ','.join(bbox) if bbox else bbox
+    coverage_id = identifier.replace(":", "__")
 
-    msg = ('Could not create WCS links for layer "%s",'
-           ' it was not in the WCS catalog,'
-           ' the available layers were: "%s"' % (
-               identifier, wcs.contents.keys()))
+    types = [
+        ("tif", _("TIFF"), "tif"),
+        ("tif", _("GeoTIFF"), "geotiff"),
+        ("jpg", _("JPEG"), "jpg"),
+        ("png", _("PNG"), "png"),
+        ("zip", _("Zipped ArcGrid"), "ArcGrid-GZIP"),
+    ]
 
     output = []
-    formats = []
-
-    if identifier not in wcs.contents:
-        if not quiet:
-            raise RuntimeError(msg)
-        else:
-            logger.warn(msg)
-    else:
-        coverage = wcs.contents[identifier]
-        formats = coverage.supportedFormats
-        for f in formats:
-            if exclude_formats and f in DEFAULT_EXCLUDE_FORMATS:
-                continue
-            # roundabout, hacky way to accomplish getting a getCoverage url.
-            # nonetheless, it's better than having to load an entire large
-            # coverage just to generate a URL
-            fakeUrl = wcs.getCoverage(identifier=coverage.id, format=f,
-                                      bbox=bbox, crs=crs, height=20,
-                                      width=20).geturl()
-            url = sub(r'(height=)20(\&width=)20', r'\g<1>{0}\g<2>{1}',
-                      fakeUrl).format(height, width)
-            # The outputs are: (ext, name, mime, url)
-            # FIXME(Ariel): Find a way to get proper ext, name and mime
-            # using format as a default for all is not good enough
-            output.append((f, f, f, url))
+    for ext, name, mime in types:
+        if exclude_formats and name in DEFAULT_EXCLUDE_FORMATS:
+            continue
+        url = _wcs_link(wcs_url, coverage_id, mime, crs, bbox)
+        output.append((ext, name, mime, url))
     return output
-
 
 def _wfs_link(wfs_url, identifier, mime, extra_params):
     params = {

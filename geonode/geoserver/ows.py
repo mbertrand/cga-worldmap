@@ -62,7 +62,6 @@ def wcs_links(
     coverage_id = identifier.replace(":", "__")
 
     types = [
-        ("tif", _("TIFF"), "tif"),
         ("tif", _("GeoTIFF"), "geotiff"),
         ("jpg", _("JPEG"), "jpg"),
         ("png", _("PNG"), "png"),

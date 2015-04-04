@@ -276,33 +276,20 @@ def geoserver_post_save(instance, sender, **kwargs):
         instance.set_permissions(
             {'users': {'AnonymousUser': ['view_resourcebase']}})
 
-        try:
-            # Potentially 3 dimensions can be returned by the grid if there is a z
-            # axis.  Since we only want width/height, slice to the second
-            # dimension
-            covWidth, covHeight = get_coverage_grid_extent(instance)[:2]
-        except GeoNodeException as e:
-            msg = _('Could not create a download link for layer.')
-            logger.warn(msg, e)
-        else:
 
-            links = wcs_links(ogc_server_settings.public_url + 'wcs?',
-                              instance.typename.encode('utf-8'),
-                              bbox=gs_resource.native_bbox[:-1],
-                              crs=gs_resource.native_bbox[-1],
-                              height=str(covHeight),
-                              width=str(covWidth))
+        links = wcs_links(ogc_server_settings.public_url + 'wcs?',
+                          instance.typename.encode('utf-8'))
 
-            for ext, name, mime, wcs_url in links:
-                Link.objects.get_or_create(resource=instance.resourcebase_ptr,
-                                           url=wcs_url,
-                                           defaults=dict(
-                                               extension=ext,
-                                               name=name,
-                                               mime=mime,
-                                               link_type='data',
-                                           )
-                                           )
+        for ext, name, mime, wcs_url in links:
+            Link.objects.get_or_create(resource=instance.resourcebase_ptr,
+                                       url=wcs_url,
+                                       defaults=dict(
+                                           extension=ext,
+                                           name=name,
+                                           mime=mime,
+                                           link_type='data',
+                                       )
+                                       )
 
         instance.set_permissions(permissions)
 
